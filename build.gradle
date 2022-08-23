@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.10'
+}
+
+group 'com.clipsoft.IDxDB'
+version '1.0-SNAPSHOT'
+
+sourceSets {
+    // JAVA 소스 파일 경로,
+    // *Test.java 이름을 갖고 있는 파일은 포함하지 않는다.
+    main.java.srcDirs = ['src/main/java']
+    main.java.exclude '**/*Test.java'
+
+    // 리소스 파일 경로
+    main.resources.srcDirs = ['src/resources/']
+    // 테스트 JAVA 소스 파일 경로, 자바 파일만 포함.
+    test.java.srcDirs = ["src/test/java"]
+    test.java.include "**/*.java"
+
+}
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
