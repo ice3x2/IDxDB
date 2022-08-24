@@ -9,6 +9,7 @@ public class DataBlockHeader {
     private final static AtomicLong TOP_ID = new AtomicLong(Long.MIN_VALUE);
 
     final static int HEADER_SIZE = 1 + 8 + 1 + 4;
+
     final static int HEADER_IDX_PREFIX = 0;
     final static int HEADER_IDX_ID = 1;
     final static int HEADER_IDX_TYPE = 9;

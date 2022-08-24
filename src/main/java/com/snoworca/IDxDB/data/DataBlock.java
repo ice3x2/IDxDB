@@ -2,6 +2,7 @@ package com.snoworca.IDxDB.data;
 
 import com.snoworca.IDxDB.exception.DataBlockParseException;
 import com.snoworca.IDxDB.util.NumberBufferConverter;
+import com.sun.scenario.effect.light.SpotLight;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -10,7 +11,12 @@ public class DataBlock {
     private DataBlockHeader header;
     private byte[] data;
 
+    private long pos = -1;
+
     private DataBlock() {}
+
+
+
 
     public static DataBlock newNullDataBlock() {
         DataBlock dataPayload = new DataBlock();
@@ -97,6 +103,41 @@ public class DataBlock {
         return buffer;
     }
 
+    public Object getValue() {
+        int type = header.getType();
+        switch (type) {
+            case DataType.TYPE_BOOLEAN:
+                return data[0] == 1;
+            case DataType.TYPE_BYTE:
+                return data[0];
+            case DataType.TYPE_CHAR:
+                return NumberBufferConverter.toChar(data);
+            case DataType.TYPE_SHORT:
+                return NumberBufferConverter.toShort(data);
+            case DataType.TYPE_INT:
+                return NumberBufferConverter.toInt(data);
+            case DataType.TYPE_FLOAT:
+                return NumberBufferConverter.toFloat(data);
+            case DataType.TYPE_LONG:
+                return NumberBufferConverter.toLong(data);
+            case DataType.TYPE_DOUBLE:
+                return NumberBufferConverter.toDouble(data);
+            case DataType.TYPE_BYTE_ARRAY:
+                return data;
+            case DataType.TYPE_STRING:
+                return new String(data, StandardCharsets.UTF_8);
+        }
+
+        return null;
+    }
+
+    void setPos(long pos) {
+        this.pos = pos;
+    }
+
+    public long getPos() {
+        return this.pos;
+    }
 
     public static DataBlock parseData(DataBlockHeader header, byte[] buffer, int offset) {
         DataBlock dataBlock = new DataBlock();
@@ -106,11 +147,11 @@ public class DataBlock {
             throw new DataBlockParseException("Data size defined in the header and the actual data size do not match.(" + len + " != " + (buffer.length - offset) + ")");
         }
 
-        if(offset != 0) {
+        if(offset == 0) {
             dataBlock.data = buffer;
         }
         else {
-            dataBlock.data = Arrays.copyOfRange(buffer, offset, len);
+            dataBlock.data = Arrays.copyOfRange(buffer, offset,offset +  len);
         }
         return dataBlock;
     }
