@@ -1,13 +1,10 @@
 package com.snoworca.IDxDB.util;
 
+import java.math.BigDecimal;
+
 public class NumberBufferConverter {
 
 
-
-    public static byte[] toBuffer(Number number) {
-
-
-    }
 
 
     public static byte[] fromChar(char value) {
@@ -137,7 +134,7 @@ public class NumberBufferConverter {
     }
 
 
-    public static byte[] fromDouble(float value) {
+    public static byte[] fromDouble(double value) {
         byte[] byteArray = new byte[4];
         fromDouble(value, byteArray, 0);
         return byteArray;
