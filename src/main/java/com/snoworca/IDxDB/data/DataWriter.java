@@ -12,9 +12,15 @@ public class DataWriter {
     private File dataFile;
     FileOutputStream fos;
     private FileChannel fileChannel;
+    private long fileLength;
 
     public DataWriter(File file) {
         this.dataFile = file;
+        this.fileLength = file.length();
+    }
+
+    public long length() {
+        return fileLength;
     }
 
     public void open() throws IOException {
@@ -33,7 +39,11 @@ public class DataWriter {
     }
 
     public void write(DataBlock block) throws IOException {
-        fileChannel.write(ByteBuffer.wrap(block.toBuffer()));
+        byte[] buffer =  block.toBuffer();
+        block.setPos(fileLength);
+        fileChannel.write(ByteBuffer.wrap(buffer));
+        this.fileLength += buffer.length;
+
     }
 
 }

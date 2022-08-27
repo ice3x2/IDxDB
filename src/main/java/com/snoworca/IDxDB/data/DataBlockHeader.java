@@ -3,6 +3,7 @@ package com.snoworca.IDxDB.data;
 import com.snoworca.IDxDB.exception.DataBlockParseException;
 import com.snoworca.IDxDB.util.NumberBufferConverter;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class DataBlockHeader {
@@ -29,6 +30,16 @@ public class DataBlockHeader {
 
     public static void setTopID(long ID) {
         TOP_ID.set(ID);
+    }
+
+    @Override
+    public boolean equals(Object eq) {
+        if(eq == this) return true;
+        if(eq instanceof DataBlockHeader) {
+            DataBlockHeader eqHeader = ((DataBlockHeader)eq);
+            return ID == eqHeader.ID && length == eqHeader.length && type == eqHeader.type;
+        }
+        return false;
     }
 
     DataBlockHeader(byte type, int length) {
@@ -69,6 +80,9 @@ public class DataBlockHeader {
         NumberBufferConverter.fromInt(this.length, buffer, HEADER_IDX_LEN);
     }
 
+
+    /*
+
     public static DataBlockHeader fromBuffer(byte[] headerBuffer) {
 
         if(headerBuffer[HEADER_IDX_PREFIX] != PREFIX) {
@@ -78,6 +92,24 @@ public class DataBlockHeader {
         dataHeader.ID = NumberBufferConverter.toLong(headerBuffer, HEADER_IDX_ID);
         dataHeader.type = headerBuffer[HEADER_IDX_TYPE];
         dataHeader.length = NumberBufferConverter.toInt(headerBuffer, HEADER_IDX_LEN);
+        if(!DataType.checkNumberTypeLength(dataHeader.type, dataHeader.length)) {
+            throw new DataBlockParseException("Size of the data defined as a primitive type is different.");
+        }
+
+        return dataHeader;
+
+    }*/
+
+
+    public static DataBlockHeader fromByteBuffer(ByteBuffer headerBuffer) {
+
+        if(headerBuffer.get() != PREFIX) {
+            throw  new DataBlockParseException("Data block header parsing error: Invalid prefix value.");
+        }
+        DataBlockHeader dataHeader = new DataBlockHeader();
+        dataHeader.ID =  headerBuffer.getLong();
+        dataHeader.type = headerBuffer.get();
+        dataHeader.length = headerBuffer.getInt();
         if(!DataType.checkNumberTypeLength(dataHeader.type, dataHeader.length)) {
             throw new DataBlockParseException("Size of the data defined as a primitive type is different.");
         }

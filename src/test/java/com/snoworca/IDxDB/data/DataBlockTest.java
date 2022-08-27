@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.xml.crypto.Data;
 
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -18,8 +19,10 @@ public class DataBlockTest {
         DataBlock block = DataBlock.newDataBlock(time);
         byte[] buffer = block.toBuffer();
 
-        DataBlockHeader header = DataBlockHeader.fromBuffer(buffer);
-        DataBlock distBlock = DataBlock.parseData(header, buffer, DataBlockHeader.HEADER_SIZE);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+
+        DataBlockHeader header = DataBlockHeader.fromByteBuffer(byteBuffer);
+        DataBlock distBlock = DataBlock.parseData(header, byteBuffer);
         assertEquals(distBlock.getValue(), block.getValue());
     }
 
@@ -29,8 +32,10 @@ public class DataBlockTest {
         DataBlock block = DataBlock.newDataBlock(value);
         byte[] buffer = block.toBuffer();
 
-        DataBlockHeader header = DataBlockHeader.fromBuffer(buffer);
-        DataBlock distBlock = DataBlock.parseData(header, buffer, DataBlockHeader.HEADER_SIZE);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+
+        DataBlockHeader header = DataBlockHeader.fromByteBuffer(byteBuffer);
+        DataBlock distBlock = DataBlock.parseData(header, byteBuffer);
         assertEquals(distBlock.getValue(), block.getValue());
         assertEquals(distBlock.getValue(), value);
         assertTrue( distBlock.getValue() instanceof  Integer);
@@ -42,8 +47,10 @@ public class DataBlockTest {
         DataBlock block = DataBlock.newDataBlock(value);
         byte[] buffer = block.toBuffer();
 
-        DataBlockHeader header = DataBlockHeader.fromBuffer(buffer);
-        DataBlock distBlock = DataBlock.parseData(header, buffer, DataBlockHeader.HEADER_SIZE);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+
+        DataBlockHeader header = DataBlockHeader.fromByteBuffer(byteBuffer);
+        DataBlock distBlock = DataBlock.parseData(header,byteBuffer);
         assertEquals(distBlock.getValue(), block.getValue());
         assertEquals(distBlock.getValue(), value);
         assertTrue( distBlock.getValue() instanceof  Byte);
@@ -55,8 +62,10 @@ public class DataBlockTest {
         DataBlock block = DataBlock.newDataBlock(value);
         byte[] buffer = block.toBuffer();
 
-        DataBlockHeader header = DataBlockHeader.fromBuffer(buffer);
-        DataBlock distBlock = DataBlock.parseData(header, buffer, DataBlockHeader.HEADER_SIZE);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+
+        DataBlockHeader header = DataBlockHeader.fromByteBuffer(byteBuffer);
+        DataBlock distBlock = DataBlock.parseData(header,byteBuffer);
         assertEquals(distBlock.getValue(), block.getValue());
         assertEquals(distBlock.getValue(), value);
         assertTrue( distBlock.getValue() instanceof  String);
@@ -71,8 +80,10 @@ public class DataBlockTest {
         DataBlock block = DataBlock.newDataBlock(value);
         byte[] buffer = block.toBuffer();
 
-        DataBlockHeader header = DataBlockHeader.fromBuffer(buffer);
-        DataBlock distBlock = DataBlock.parseData(header, buffer, DataBlockHeader.HEADER_SIZE);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+
+        DataBlockHeader header = DataBlockHeader.fromByteBuffer(byteBuffer);
+        DataBlock distBlock = DataBlock.parseData(header, byteBuffer);
         assertArrayEquals( (byte[])distBlock.getValue(), (byte[])block.getValue());
         assertArrayEquals((byte[])distBlock.getValue(), value);
         assertEquals( ((byte[])distBlock.getValue()).length, len);

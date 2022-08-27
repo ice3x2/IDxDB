@@ -3,6 +3,8 @@ package com.snoworca.IDxDB.data;
 import com.snoworca.IDxDB.exception.DataBlockParseException;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,7 +17,9 @@ public class DataBlockHeaderTest {
         byte[] buffer = new byte[DataBlockHeader.HEADER_SIZE];
         dataHeader.writeBuffer(buffer);
 
-        DataBlockHeader distDataHeader = DataBlockHeader.fromBuffer(buffer);
+        ByteBuffer headerByteBuffer = ByteBuffer.wrap(buffer);
+
+        DataBlockHeader distDataHeader = DataBlockHeader.fromByteBuffer(headerByteBuffer);
 
         assertEquals(distDataHeader.getID(), dataHeader.getID());
         assertEquals(distDataHeader.getLength(), 8);
@@ -39,8 +43,10 @@ public class DataBlockHeaderTest {
         dataHeader.writeBuffer(buffer);
         buffer[DataBlockHeader.HEADER_IDX_TYPE] = DataType.TYPE_BYTE;
 
+        ByteBuffer headerByteBuffer = ByteBuffer.wrap(buffer);
+
         try {
-            DataBlockHeader distDataHeader = DataBlockHeader.fromBuffer(buffer);
+            DataBlockHeader distDataHeader = DataBlockHeader.fromByteBuffer(headerByteBuffer);
         } catch (DataBlockParseException e) {
             e.printStackTrace();
             return;

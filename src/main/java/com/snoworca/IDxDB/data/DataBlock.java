@@ -4,6 +4,7 @@ import com.snoworca.IDxDB.exception.DataBlockParseException;
 import com.snoworca.IDxDB.util.NumberBufferConverter;
 import com.sun.scenario.effect.light.SpotLight;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -18,12 +19,15 @@ public class DataBlock {
 
 
 
+
     public static DataBlock newNullDataBlock() {
         DataBlock dataPayload = new DataBlock();
         dataPayload.header = new DataBlockHeader(DataType.TYPE_NULL, 0);
         dataPayload.data = new byte[0];
         return dataPayload;
     }
+
+
 
     public static DataBlock newDataBlock(Byte value) {
         DataBlock dataPayload = new DataBlock();
@@ -103,6 +107,11 @@ public class DataBlock {
         return buffer;
     }
 
+    public byte[] getData() {
+        return data;
+    }
+
+
     public Object getValue() {
         int type = header.getType();
         switch (type) {
@@ -139,6 +148,8 @@ public class DataBlock {
         return this.pos;
     }
 
+
+    /*
     public static DataBlock parseData(DataBlockHeader header, byte[] buffer, int offset) {
         DataBlock dataBlock = new DataBlock();
         dataBlock.header = header;
@@ -154,10 +165,28 @@ public class DataBlock {
             dataBlock.data = Arrays.copyOfRange(buffer, offset,offset +  len);
         }
         return dataBlock;
+    }*/
+
+    public static DataBlock parseData(DataBlockHeader header, ByteBuffer byteBuffer) {
+        DataBlock dataBlock = new DataBlock();
+        dataBlock.header = header;
+        int len = header.getLength();
+        int remaining = byteBuffer.remaining();
+        if(len != remaining ) {
+            throw new DataBlockParseException("Data size defined in the header and the actual data size do not match.(" + len + " != " + (remaining) + ")");
+        }
+        dataBlock.data = new byte[len];
+        byteBuffer.get(dataBlock.data, 0, len);
+        return dataBlock;
     }
 
-    public static DataBlock parseData(DataBlockHeader header, byte[] buffer) {
+    /*public static DataBlock parseData(DataBlockHeader header, byte[] buffer) {
         return parseData(header, buffer, 0);
+    }*/
+
+
+    public DataBlockHeader getHeader() {
+        return this.header;
     }
 
 
