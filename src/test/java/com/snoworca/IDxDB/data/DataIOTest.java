@@ -15,7 +15,7 @@ class DataIOTest {
     private static String makeRandomString() {
         int leftLimit = 97; // letter 'a'
         int rightLimit = 122; // letter 'z'
-        int targetStringLength = ThreadLocalRandom.current().nextInt(3000) + 5;
+        int targetStringLength = 4096 - 13;///ThreadLocalRandom.current().nextInt(3000) + 5;
         Random random = new Random();
         StringBuilder buffer = new StringBuilder(targetStringLength);
         for (int i = 0; i < targetStringLength; i++) {
@@ -85,7 +85,6 @@ class DataIOTest {
             assertArrayEquals(loadedBlock.getData(), block.getData());
             assertEquals(loadedBlock.getPos(), block.getPos());
             assertEquals(loadedBlock.getHeader(), block.getHeader());
-
         }
 
         System.out.println("랜덤 읽기 속도: " + (System.currentTimeMillis() - start) + "ms");

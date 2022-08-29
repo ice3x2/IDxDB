@@ -11,8 +11,56 @@ public interface DataType {
     public final static byte TYPE_DOUBLE = 7;
     public final static byte TYPE_BOOLEAN = 8;
     public final static byte TYPE_STRING = 9;
+
     public final static byte TYPE_BYTE_ARRAY = 10;
-    public final static byte TYPE_OBJECT = 11;
+
+    public final static byte TYPE_ARRAY = 12;
+    public final static byte TYPE_OBJECT = 30;
+
+    public static byte getDataType(Class<?> type) {
+        if(Byte.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_BYTE;
+        }
+        else if(Boolean.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_BOOLEAN;
+        }
+        else if(Short.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_SHORT;
+        }
+        else if(Character.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_CHAR;
+        }
+        else if(Integer.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_INT;
+        }
+        else if(Float.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_FLOAT;
+        }
+        else if(Long.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_LONG;
+        }
+        else if(Double.TYPE.isAssignableFrom(type)) {
+            return DataType.TYPE_DOUBLE;
+        }
+        else if(CharSequence.class.isAssignableFrom(type)) {
+            return DataType.TYPE_STRING;
+        }
+        else if(CharSequence.class.isAssignableFrom(type)) {
+            return DataType.TYPE_STRING;
+        }
+        else if(CharSequence.class.isAssignableFrom(type)) {
+            return DataType.TYPE_STRING;
+        }
+        else if(type.isArray()) {
+            if(Byte.TYPE.isAssignableFrom(type.getComponentType())) {
+                return DataType.TYPE_BYTE_ARRAY;
+            }
+            return DataType.TYPE_ARRAY;
+        }
+
+        return -1;
+
+    }
 
     public static boolean isNumberType(byte type) {
         return type >= TYPE_BYTE && type <= TYPE_DOUBLE;
