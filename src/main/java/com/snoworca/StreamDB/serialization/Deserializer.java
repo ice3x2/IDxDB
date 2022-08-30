@@ -87,7 +87,7 @@ public class Deserializer {
         if(remaining < 4) {
             return NumberBufferConverter.toFloat(getBridgeBuffer(4));
         }
-        float value = currentBuffer.getFloat();remaining -= 2;
+        float value = currentBuffer.getFloat();
         remaining -= 4;
         return value;
     }
@@ -110,20 +110,14 @@ public class Deserializer {
         return value;
     }
 
-    public String getString() {
-        int len = getInt();
-        if(len < 0) return null;
-        if(len == 0) {
-            return "";
-        }
-        if(remaining < len) {
-            byte[] buffer = getBridgeBuffer(len);
-            return new String(buffer, StandardCharsets.UTF_8);
-        }
-        byte[] buffer = new byte[len];
-        currentBuffer.get(buffer, 0, len);
-        remaining -= len;
-        return new String(buffer, StandardCharsets.UTF_8);
+    public String getString(int maxLength) {
+        int realLen = getInt();
+        maxLength = maxLength * 2;
+        byte[] buffer = new byte[maxLength];
+        currentBuffer.get(buffer, 0, maxLength);
+        remaining -= maxLength;
+        String value = new String(buffer,0, realLen, StandardCharsets.UTF_16);
+        return value;
     }
 
     public byte[] getBuffer() {

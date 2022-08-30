@@ -1,7 +1,6 @@
 package com.snoworca.StreamDB.serialization;
 
 import com.snoworca.IDxDB.data.DataType;
-import com.snoworca.IDxDB.util.ByteBufferOutputStream;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -47,25 +46,86 @@ public class TypeSerializableTable<T> {
             for(int i = 0; i < fields.length; ++i) {
                 Field field = fields[i];
                 field.setAccessible(true);
-                SerializeField serializeFieldAnnotation = field.getAnnotation(SerializeField.class);
-                if(serializeFieldAnnotation == null) continue;
-                String fieldName = serializeFieldAnnotation.value();
-
-                if(fieldName.isEmpty()) fieldName = field.getName();
-                if(fieldName.isEmpty() || fieldNames.contains(fieldName)) continue;
-                fieldNames.add(fieldName);
-
-                FieldInfo fieldInfo = new FieldInfo(field, fieldName);
-                if(fieldInfo.type < 0) {
-                    continue;
+                if(!initPrimitiveField(field, fieldNames, fieldInfoList)) {
+                    initStringField(field, fieldNames, fieldInfoList);
                 }
-                fieldInfoList.add(fieldInfo);
             }
             targetType = (Class<?>)targetType.getSuperclass();
         } while (targetType != Object.class);
         Collections.sort(fieldInfoList);
         this.fieldInfoList = fieldInfoList;
     }
+
+    private boolean initArrayField(Field field, HashSet<String> fieldNames, ArrayList<FieldInfo> fieldInfoList) {
+        ArrayColumn arrayColumnAnnotation = field.getAnnotation(ArrayColumn.class);
+        if(arrayColumnAnnotation == null) return false;
+        Class<?> fieldType = field.getType();
+        if(!fieldType.isArray()) {
+            throw new InvalidTypeException("@ArrayColumn annotation cannot be used for the field '" + field.getName() + "' of the '" + type.getName() +"' class.");
+        }
+        String fieldName = arrayColumnAnnotation.name();
+        if(fieldName.isEmpty()) fieldName = field.getName();
+        if(fieldName.isEmpty() || fieldNames.contains(fieldName)) return false;
+        fieldNames.add(fieldName);
+
+        Class<?> componentType = fieldType.getComponentType();
+        if(componentType.isAssignableFrom(String.class)) {
+
+        }
+        else if(componentType.isPrimitive()) {
+            
+        }
+
+        FieldInfo fieldInfo = new FieldInfo(field, fieldName);
+        if(fieldInfo.type < 0) {
+            return false;
+        }
+        fieldInfoList.add(fieldInfo);
+        return true;
+    }
+
+
+    private boolean initPrimitiveField(Field field, HashSet<String> fieldNames, ArrayList<FieldInfo> fieldInfoList) {
+        PrimitiveColumn primitiveColumnAnnotation = field.getAnnotation(PrimitiveColumn.class);
+        if(primitiveColumnAnnotation == null) return false;
+        if(!field.getType().isPrimitive()) {
+            throw new InvalidTypeException("@PrimitiveColumn annotation cannot be used for the field '" + field.getName() + "' of the '" + type.getName() +"' class.");
+        }
+        String fieldName = primitiveColumnAnnotation.value();
+        if(fieldName.isEmpty()) fieldName = field.getName();
+        if(fieldName.isEmpty() || fieldNames.contains(fieldName)) return false;
+        fieldNames.add(fieldName);
+
+        FieldInfo fieldInfo = new FieldInfo(field, fieldName);
+        if(fieldInfo.type < 0) {
+            return false;
+        }
+        fieldInfoList.add(fieldInfo);
+        return true;
+    }
+
+    private boolean initStringField(Field field, HashSet<String> fieldNames, ArrayList<FieldInfo> fieldInfoList) {
+        StringColumn stringColumnAnnotation = field.getAnnotation(StringColumn.class);
+        if(stringColumnAnnotation == null) return false;
+        if(!field.getType().isAssignableFrom(String.class)) {
+            throw new InvalidTypeException("@StringColumn annotation cannot be used for the field '" + field.getName() + "' of the '" + type.getName() +"' class.");
+        }
+        String fieldName = stringColumnAnnotation.name();
+        if(fieldName.isEmpty()) fieldName = field.getName();
+        if(fieldName.isEmpty() || fieldNames.contains(fieldName)) return false;
+        fieldNames.add(fieldName);
+
+        FieldInfo fieldInfo = new FieldInfo(field, fieldName);
+        if(fieldInfo.type < 0) {
+            return false;
+        }
+        fieldInfo.size = stringColumnAnnotation.maxSize();
+        fieldInfo.isPrimitive = false;
+        fieldInfo.cutOverSize = stringColumnAnnotation.cutOverSize();
+        fieldInfoList.add(fieldInfo);
+        return true;
+    }
+
 
     private static class FieldInfo implements Comparable {
         FieldInfo(Field field, String name) {
@@ -74,9 +134,13 @@ public class TypeSerializableTable<T> {
             this.type = DataType.getDataType(this.field.getType());
         }
         byte type;
+        boolean isPrimitive = true;
+        boolean cutOverSize = true;
 
         Field field;
         String name;
+
+        int size = 0;
 
         @Override
         public int compareTo(Object o) {
@@ -88,45 +152,67 @@ public class TypeSerializableTable<T> {
 
     public ByteBuffer serialize(T obj) throws IllegalAccessException {
         Serializer serializer = new Serializer(bufferSize);
+
+
         for(int i = 0, n = fieldInfoList.size(); i < n; ++i) {
             FieldInfo fieldInfo = fieldInfoList.get(i);
             switch (fieldInfo.type) {
                 case DataType.TYPE_BYTE:
-                    serializer.put(fieldInfo.field.getByte(obj));
+                    serializer.putByte(fieldInfo.field.getByte(obj));
+                    System.out.print("byte->");
                     break;
                 case DataType.TYPE_BOOLEAN:
-                    serializer.put(fieldInfo.field.getBoolean(obj) ? 1 : 0);
+                    serializer.putBoolean(fieldInfo.field.getBoolean(obj));
+                    System.out.print("boolean->");
                     break;
                 case DataType.TYPE_SHORT:
-                    serializer.put(fieldInfo.field.getShort(obj));
+                    serializer.putShort(fieldInfo.field.getShort(obj));
+                    System.out.print("short->");
                     break;
                 case DataType.TYPE_CHAR:
-                    serializer.put((char)fieldInfo.field.getChar(obj));
+                    serializer.putCharacter(fieldInfo.field.getChar(obj));
+                    System.out.print("char->");
                     break;
                 case DataType.TYPE_INT:
-                    serializer.put(fieldInfo.field.getInt(obj));
+                    serializer.putInteger(fieldInfo.field.getInt(obj));
+                    System.out.print("integer->");
                     break;
                 case DataType.TYPE_FLOAT:
-                    serializer.put(fieldInfo.field.getFloat(obj));
+                    serializer.putFloat(fieldInfo.field.getFloat(obj));
+                    System.out.print("float(" + fieldInfo.name  + ")->");
                     break;
                 case DataType.TYPE_LONG:
-                    serializer.put(fieldInfo.field.getLong(obj));
+                    serializer.putLong(fieldInfo.field.getLong(obj));
+                    System.out.print("long->");
+                    break;
+                case DataType.TYPE_DOUBLE:
+                    serializer.putDouble(fieldInfo.field.getDouble(obj));
+                    System.out.print("double->");
                     break;
                 case DataType.TYPE_STRING:
-                    serializer.put((String)fieldInfo.field.get(obj));
+                    String value = (String)fieldInfo.field.get(obj);
+                    if(value.length() > fieldInfo.size) {
+                        throw new MaxSizeExceededException("String size exceeded the length set in '" + fieldInfo.field.getName()  +"' field variable of '" + type.getName() + "' class. (" + value.length()  + "<" + fieldInfo.size + ")(x)");
+                    }
+                    serializer.putString(value, fieldInfo.size);
                     break;
                 case DataType.TYPE_BYTE_ARRAY:
-                    serializer.put((byte[])fieldInfo.field.get(obj));
+                    serializer.putByteArray((byte[])fieldInfo.field.get(obj));
                     break;
             }
 
         }
-        return serializer.getByteBuffer();
+        System.out.println("end");
+        ByteBuffer buffer = serializer.getByteBuffer();
+        return buffer;
     }
 
     public T deserialize(List<ByteBuffer> bufferList) throws Exception, InvocationTargetException, InstantiationException, IllegalAccessException {
         Deserializer deserializer = new Deserializer(bufferList);
         Constructor<T> constructor = type.getDeclaredConstructor();
+
+
+
         constructor.setAccessible(true);
         T obj = constructor.newInstance();
         for(int i = 0, n = fieldInfoList.size(); i < n; ++i) {
@@ -134,34 +220,46 @@ public class TypeSerializableTable<T> {
             switch (fieldInfo.type) {
                 case DataType.TYPE_BYTE:
                      fieldInfo.field.set(obj, deserializer.getByte());
+                    System.out.print("byte->");
                     break;
                 case DataType.TYPE_BOOLEAN:
                     fieldInfo.field.set(obj, deserializer.getBoolean());
+                    System.out.print("boolean->");
                     break;
                 case DataType.TYPE_SHORT:
                     fieldInfo.field.set(obj,deserializer.getShort());
+                    System.out.print("short->");
                     break;
                 case DataType.TYPE_CHAR:
                     fieldInfo.field.set(obj,deserializer.getChar());
+                    System.out.print("char->");
                     break;
                 case DataType.TYPE_INT:
                     fieldInfo.field.set(obj,deserializer.getInt());
+                    System.out.print("int->");
                     break;
                 case DataType.TYPE_FLOAT:
                     fieldInfo.field.set(obj,deserializer.getFloat());
+                    System.out.print("float->");
+                    break;
+                case DataType.TYPE_DOUBLE:
+                    fieldInfo.field.set(obj,deserializer.getDouble());
+                    System.out.print("double(" + fieldInfo.name  + ")->");
                     break;
                 case DataType.TYPE_LONG:
                     fieldInfo.field.set(obj,deserializer.getLong());
+                    System.out.print("long->");
                     break;
                 case DataType.TYPE_STRING:
-                    fieldInfo.field.set(obj,deserializer.getString());
+                    String str = deserializer.getString(fieldInfo.size);
+                    fieldInfo.field.set(obj,str);
                     break;
                 case DataType.TYPE_BYTE_ARRAY:
                     fieldInfo.field.set(obj,deserializer.getBuffer());
                     break;
             }
-
         }
+        System.out.println("end");
 
 
 

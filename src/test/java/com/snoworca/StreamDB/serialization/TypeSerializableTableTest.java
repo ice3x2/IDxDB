@@ -4,21 +4,19 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static java.util.Objects.deepEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
+
 
 class TypeSerializableTableTest {
 
 
-    private static String makeRandomString() {
+    private static String makeRandomString(int minLength, int maxLength) {
         int leftLimit = 97; // letter 'a'
         int rightLimit = 122; // letter 'z'
-        int targetStringLength = 4096 - 13;///ThreadLocalRandom.current().nextInt(3000) + 5;
+        int targetStringLength = ThreadLocalRandom.current().nextInt(maxLength - minLength) + minLength;
         Random random = new Random();
         StringBuilder buffer = new StringBuilder(targetStringLength);
         for (int i = 0; i < targetStringLength; i++) {
@@ -30,12 +28,14 @@ class TypeSerializableTableTest {
     }
 
     @Test
-    public void serializedSerializeTes() throws IllegalAccessException {
+    public void serializedSerializeTes() throws Exception {
         TypeSerializableTable<TestClass> table = TypeSerializableTable.newTable(TestClass.class);
         TestClass originTestClass = new TestClass();
         ByteBuffer buffer = table.serialize(originTestClass);
         ArrayList<ByteBuffer> bufferList = new ArrayList<>();
+        bufferList.add(buffer);
         TestClass testClass = table.deserialize(bufferList);
+        assertEquals(originTestClass.vStr, testClass.vStr);
         assertEquals(originTestClass, testClass);
     }
 
@@ -46,25 +46,27 @@ class TypeSerializableTableTest {
     public static class TestClass implements DataSerializable {
 
 
-        @SerializeField
+        @PrimitiveColumn
         boolean vBool;
-        @SerializeField
+        @PrimitiveColumn
         byte vb;
-        @SerializeField
+        @PrimitiveColumn
         short vs;
-        @SerializeField
+        @PrimitiveColumn
         char vc;
-        @SerializeField
+        @PrimitiveColumn
         int vi;
-        @SerializeField
+        @PrimitiveColumn
         float vf;
-        @SerializeField
+        @PrimitiveColumn
         long vl;
-        @SerializeField
+        @PrimitiveColumn
         double vd;
-        @SerializeField
+        //@PrimitiveField
         byte[] vBuffer;
-        @SerializeField("string")
+        //@PrimitiveField("string")
+
+        @StringColumn(maxSize = 2000, cutOverSize = false)
         String vStr;
 
         public TestClass() {
@@ -79,7 +81,7 @@ class TypeSerializableTableTest {
             vd = rand.nextDouble();
             vBuffer = new byte[rand.nextInt(1024) + 10];
             rand.nextBytes(vBuffer);
-            this.vStr = makeRandomString();
+            this.vStr = makeRandomString(1, 2000);
 
         }
 
@@ -95,7 +97,7 @@ class TypeSerializableTableTest {
                         target.vf == this.vf &&
                         target.vl == this.vl &&
                         target.vd == this.vd &&
-                        Arrays.equals(target.vBuffer, this.vBuffer) &&
+                       // Arrays.equals(target.vBuffer, this.vBuffer) &&
                         this.vStr.equals(target.vStr);
             }
             return false;
@@ -118,7 +120,8 @@ class TypeSerializableTableTest {
 
         @Override
         public void serialize(Serializer serializer) throws Exception {
-            serializer.put(vBool).put(vb).put(vc).put(vs).put(vi).put(vf).put(vl).put(vd).put(vBuffer).put(vStr).put(vi);
+            serializer.putBoolean(vBool).putByte(vb).putCharacter(vc).putShort(vs).putInteger(vi).putFloat(vf).putLong(vl)
+                    .putDouble(vd).putByteArray(vBuffer).putString(vStr, 100).putInteger(vi);
         }
 
         @Override

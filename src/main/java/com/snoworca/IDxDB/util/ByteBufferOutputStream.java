@@ -121,6 +121,7 @@ public class ByteBufferOutputStream extends OutputStream {
             }
             ensureCapacity(count + len);
             byteBuffer.put(b, off, len);
+
             //System.arraycopy(b, off, buf, count, len);
             count += len;
         }
@@ -150,7 +151,7 @@ public class ByteBufferOutputStream extends OutputStream {
         public void writeChar(char value) {
             int len = 2;
             ensureCapacity(count + len);
-            byteBuffer.putChar(value);
+            byteBuffer.putShort((short)value);
             count += len;
         }
 
@@ -294,8 +295,11 @@ public class ByteBufferOutputStream extends OutputStream {
         public void close() throws IOException {
         }
 
-        public ByteBuffer getByteBuffer() {
-            return byteBuffer;
+        public ByteBuffer toByteBuffer() {
+            ByteBuffer resultBuffer = ByteBuffer.wrap(buffer);
+            resultBuffer.limit(count);
+            resultBuffer.position(0);
+            return resultBuffer;
         }
 
 }

@@ -4,6 +4,7 @@ import com.snoworca.IDxDB.util.ByteBufferOutputStream;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 public class Serializer {
 
@@ -19,55 +20,55 @@ public class Serializer {
         byteBufferOutputStream = new ByteBufferOutputStream(4096);
     }
 
-    public Serializer put(Byte value) {
+    public Serializer putByte(Byte value) {
         byteBufferOutputStream.write(value);
         return this;
     }
 
-    public Serializer put(Boolean value) {
+    public Serializer putBoolean(Boolean value) {
         byteBufferOutputStream.write(value ? 1 : 0);
         return this;
     }
-    public Serializer put(Short value) {
+    public Serializer putShort(Short value) {
         byteBufferOutputStream.writeShort(value);
         return this;
     }
-    public Serializer put(Character value) {
+    public Serializer putCharacter(Character value) {
         byteBufferOutputStream.writeChar(value);
         return this;
     }
-    public Serializer put(Integer value) {
+    public Serializer putInteger(Integer value) {
         byteBufferOutputStream.writeInt(value);
         return this;
     }
-    public Serializer put(Float value) {
+    public Serializer putFloat(Float value) {
         byteBufferOutputStream.writeFloat(value);
         return this;
     }
-    public Serializer put(Long value) {
+    public Serializer putLong(Long value) {
         byteBufferOutputStream.writeLong(value);
         return this;
     }
 
-    public Serializer put(Double value) {
+    public Serializer putDouble(Double value) {
         byteBufferOutputStream.writeDouble(value);
         return this;
     }
 
-    public Serializer put(String value) {
-        if(value == null) {
-            byteBufferOutputStream.writeInt(-1);
-        }  else if(value.isEmpty()) {
-            byteBufferOutputStream.writeInt(0);
-            return this;
-        }
-        byte[] buffer = value.getBytes(StandardCharsets.UTF_8);
-        byteBufferOutputStream.writeInt(buffer.length);
-        byteBufferOutputStream.write(buffer, 0, buffer.length);
+    public Serializer putString(String value, int maxLength) {
+        if(maxLength <= 0) return this;
+        maxLength = maxLength * 2;
+        byte[] buffer = value.getBytes(StandardCharsets.UTF_16);
+        int writeLength = Math.min(buffer.length, maxLength);
+        putInteger(writeLength);
+        byteBufferOutputStream.write(buffer, 0, writeLength);
+        if(writeLength == maxLength) return this;
+        byte[] leftBuffer = new byte[maxLength - writeLength];
+        byteBufferOutputStream.write(leftBuffer, 0, leftBuffer.length);
         return this;
     }
 
-    public Serializer put(byte[] value) {
+    public Serializer putByteArray(byte[] value) {
         if(value == null) {
             byteBufferOutputStream.writeInt(-1);
             return this;
@@ -81,7 +82,7 @@ public class Serializer {
     }
 
     public ByteBuffer getByteBuffer() {
-        return byteBufferOutputStream.getByteBuffer();
+        return byteBufferOutputStream.toByteBuffer();
     }
 
 
