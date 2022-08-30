@@ -69,16 +69,23 @@ public class TypeSerializableTable<T> {
         fieldNames.add(fieldName);
 
         Class<?> componentType = fieldType.getComponentType();
+        StringColumn stringColumn = null;
         if(componentType.isAssignableFrom(String.class)) {
-
+            stringColumn = componentType.getAnnotation(StringColumn.class);
+            if(stringColumn == null) {
+                //TODO 여기서 예외 발생.
+            }
         }
-        else if(componentType.isPrimitive()) {
-            
-        }
-
         FieldInfo fieldInfo = new FieldInfo(field, fieldName);
-        if(fieldInfo.type < 0) {
+        if(fieldInfo.type < 0 || fieldInfo.componentType < 0) {
+            //TODO 여기서도 예외 발생 시켜야한다.
             return false;
+        }
+        fieldInfo.arraySize = arrayColumnAnnotation.maxSize();
+        fieldInfo.cutOverSizeOfArray = arrayColumnAnnotation.cutOverSize();
+        if(stringColumn != null) {
+            fieldInfo.size = stringColumn.maxSize();
+            fieldInfo.cutOverSize = stringColumn.cutOverSize();
         }
         fieldInfoList.add(fieldInfo);
         return true;
@@ -131,12 +138,26 @@ public class TypeSerializableTable<T> {
         FieldInfo(Field field, String name) {
             this.field = field;
             this.name = name;
-            this.type = DataType.getDataType(this.field.getType());
+            Class<?> type = this.field.getType();
+            this.type = DataType.getDataType(type);
+            if(type.isArray()) {
+                componentType = DataType.getDataType(type.getComponentType());
+                try {
+                    fieldOfArrayLength = type.getField("length");
+                } catch (NoSuchFieldException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
+        boolean isArray = false;
+        int arraySize = 0;
+        boolean cutOverSizeOfArray = false;
         byte type;
+        byte componentType;
         boolean isPrimitive = true;
         boolean cutOverSize = true;
 
+        Field fieldOfArrayLength;
         Field field;
         String name;
 
@@ -196,11 +217,13 @@ public class TypeSerializableTable<T> {
                     }
                     serializer.putString(value, fieldInfo.size);
                     break;
-                case DataType.TYPE_BYTE_ARRAY:
-                    serializer.putByteArray((byte[])fieldInfo.field.get(obj));
+                case DataType.TYPE_ARRAY:
+                    Object arrayObject = fieldInfo.field.get(obj);
+                    int length = (int)fieldInfo.fieldOfArrayLength.get(arrayObject);
+                    serializer.putInteger(length);
+                    //TODO 배열 요소들을 꺼내서 버퍼에 넣어야한다.
                     break;
             }
-
         }
         System.out.println("end");
         ByteBuffer buffer = serializer.getByteBuffer();

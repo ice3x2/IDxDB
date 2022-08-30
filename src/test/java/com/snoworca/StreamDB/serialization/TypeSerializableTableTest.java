@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -97,7 +98,7 @@ class TypeSerializableTableTest {
                         target.vf == this.vf &&
                         target.vl == this.vl &&
                         target.vd == this.vd &&
-                       // Arrays.equals(target.vBuffer, this.vBuffer) &&
+                        Arrays.equals(target.vBuffer, this.vBuffer) &&
                         this.vStr.equals(target.vStr);
             }
             return false;

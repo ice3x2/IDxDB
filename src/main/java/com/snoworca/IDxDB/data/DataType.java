@@ -52,9 +52,6 @@ public interface DataType {
             return DataType.TYPE_STRING;
         }
         else if(type.isArray()) {
-            if(Byte.TYPE.isAssignableFrom(type.getComponentType())) {
-                return DataType.TYPE_BYTE_ARRAY;
-            }
             return DataType.TYPE_ARRAY;
         }
 
