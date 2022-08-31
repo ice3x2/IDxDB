@@ -55,16 +55,10 @@ public class Serializer {
         return this;
     }
 
-    public Serializer putString(String value, int maxLength) {
-        if(maxLength <= 0) return this;
-        maxLength = maxLength * 2;
-        byte[] buffer = value.getBytes(StandardCharsets.UTF_16);
-        int writeLength = Math.min(buffer.length, maxLength);
-        putInteger(writeLength);
-        byteBufferOutputStream.write(buffer, 0, writeLength);
-        if(writeLength == maxLength) return this;
-        byte[] leftBuffer = new byte[maxLength - writeLength];
-        byteBufferOutputStream.write(leftBuffer, 0, leftBuffer.length);
+    public Serializer putString(String value) {
+        byte[] buffer = value.getBytes(StandardCharsets.UTF_8);
+        putInteger(buffer.length);
+        byteBufferOutputStream.write(buffer, 0, buffer.length);
         return this;
     }
 

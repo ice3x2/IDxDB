@@ -47,27 +47,27 @@ class TypeSerializableTableTest {
     public static class TestClass implements DataSerializable {
 
 
-        @PrimitiveColumn
+        @Column
         boolean vBool;
-        @PrimitiveColumn
+        @Column
         byte vb;
-        @PrimitiveColumn
+        @Column
         short vs;
-        @PrimitiveColumn
+        @Column
         char vc;
-        @PrimitiveColumn
+        @Column
         int vi;
-        @PrimitiveColumn
+        @Column
         float vf;
-        @PrimitiveColumn
+        @Column
         long vl;
-        @PrimitiveColumn
+        @Column
         double vd;
         //@PrimitiveField
         byte[] vBuffer;
         //@PrimitiveField("string")
 
-        @StringColumn(maxSize = 2000, cutOverSize = false)
+        @Column
         String vStr;
 
         public TestClass() {
@@ -122,7 +122,7 @@ class TypeSerializableTableTest {
         @Override
         public void serialize(Serializer serializer) throws Exception {
             serializer.putBoolean(vBool).putByte(vb).putCharacter(vc).putShort(vs).putInteger(vi).putFloat(vf).putLong(vl)
-                    .putDouble(vd).putByteArray(vBuffer).putString(vStr, 100).putInteger(vi);
+                    .putDouble(vd).putByteArray(vBuffer).putString(vStr).putInteger(vi);
         }
 
         @Override

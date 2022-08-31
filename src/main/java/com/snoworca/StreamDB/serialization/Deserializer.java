@@ -110,14 +110,15 @@ public class Deserializer {
         return value;
     }
 
-    public String getString(int maxLength) {
-        int realLen = getInt();
-        maxLength = maxLength * 2;
-        byte[] buffer = new byte[maxLength];
-        currentBuffer.get(buffer, 0, maxLength);
-        remaining -= maxLength;
-        String value = new String(buffer,0, realLen, StandardCharsets.UTF_16);
-        return value;
+    public String getString() {
+        int bufferLen = getInt();
+        if(bufferLen == -1) {
+            return null;
+        }
+        byte[] buffer = new byte[bufferLen];
+        currentBuffer.get(buffer,0,bufferLen);
+        remaining -= bufferLen;
+        return new String(buffer, StandardCharsets.UTF_8);
     }
 
     public byte[] getBuffer() {

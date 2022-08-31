@@ -47,7 +47,7 @@ public class TypeSerializableTable<T> {
                 Field field = fields[i];
                 field.setAccessible(true);
                 if(!initPrimitiveField(field, fieldNames, fieldInfoList)) {
-                    initStringField(field, fieldNames, fieldInfoList);
+
                 }
             }
             targetType = (Class<?>)targetType.getSuperclass();
@@ -56,79 +56,22 @@ public class TypeSerializableTable<T> {
         this.fieldInfoList = fieldInfoList;
     }
 
-    private boolean initArrayField(Field field, HashSet<String> fieldNames, ArrayList<FieldInfo> fieldInfoList) {
-        ArrayColumn arrayColumnAnnotation = field.getAnnotation(ArrayColumn.class);
-        if(arrayColumnAnnotation == null) return false;
-        Class<?> fieldType = field.getType();
-        if(!fieldType.isArray()) {
-            throw new InvalidTypeException("@ArrayColumn annotation cannot be used for the field '" + field.getName() + "' of the '" + type.getName() +"' class.");
-        }
-        String fieldName = arrayColumnAnnotation.name();
-        if(fieldName.isEmpty()) fieldName = field.getName();
-        if(fieldName.isEmpty() || fieldNames.contains(fieldName)) return false;
-        fieldNames.add(fieldName);
-
-        Class<?> componentType = fieldType.getComponentType();
-        StringColumn stringColumn = null;
-        if(componentType.isAssignableFrom(String.class)) {
-            stringColumn = componentType.getAnnotation(StringColumn.class);
-            if(stringColumn == null) {
-                //TODO 여기서 예외 발생.
-            }
-        }
-        FieldInfo fieldInfo = new FieldInfo(field, fieldName);
-        if(fieldInfo.type < 0 || fieldInfo.componentType < 0) {
-            //TODO 여기서도 예외 발생 시켜야한다.
-            return false;
-        }
-        fieldInfo.arraySize = arrayColumnAnnotation.maxSize();
-        fieldInfo.cutOverSizeOfArray = arrayColumnAnnotation.cutOverSize();
-        if(stringColumn != null) {
-            fieldInfo.size = stringColumn.maxSize();
-            fieldInfo.cutOverSize = stringColumn.cutOverSize();
-        }
-        fieldInfoList.add(fieldInfo);
-        return true;
-    }
 
 
     private boolean initPrimitiveField(Field field, HashSet<String> fieldNames, ArrayList<FieldInfo> fieldInfoList) {
-        PrimitiveColumn primitiveColumnAnnotation = field.getAnnotation(PrimitiveColumn.class);
+        Column primitiveColumnAnnotation = field.getAnnotation(Column.class);
         if(primitiveColumnAnnotation == null) return false;
-        if(!field.getType().isPrimitive()) {
-            throw new InvalidTypeException("@PrimitiveColumn annotation cannot be used for the field '" + field.getName() + "' of the '" + type.getName() +"' class.");
-        }
         String fieldName = primitiveColumnAnnotation.value();
         if(fieldName.isEmpty()) fieldName = field.getName();
         if(fieldName.isEmpty() || fieldNames.contains(fieldName)) return false;
         fieldNames.add(fieldName);
-
         FieldInfo fieldInfo = new FieldInfo(field, fieldName);
+        
+
+
         if(fieldInfo.type < 0) {
             return false;
         }
-        fieldInfoList.add(fieldInfo);
-        return true;
-    }
-
-    private boolean initStringField(Field field, HashSet<String> fieldNames, ArrayList<FieldInfo> fieldInfoList) {
-        StringColumn stringColumnAnnotation = field.getAnnotation(StringColumn.class);
-        if(stringColumnAnnotation == null) return false;
-        if(!field.getType().isAssignableFrom(String.class)) {
-            throw new InvalidTypeException("@StringColumn annotation cannot be used for the field '" + field.getName() + "' of the '" + type.getName() +"' class.");
-        }
-        String fieldName = stringColumnAnnotation.name();
-        if(fieldName.isEmpty()) fieldName = field.getName();
-        if(fieldName.isEmpty() || fieldNames.contains(fieldName)) return false;
-        fieldNames.add(fieldName);
-
-        FieldInfo fieldInfo = new FieldInfo(field, fieldName);
-        if(fieldInfo.type < 0) {
-            return false;
-        }
-        fieldInfo.size = stringColumnAnnotation.maxSize();
-        fieldInfo.isPrimitive = false;
-        fieldInfo.cutOverSize = stringColumnAnnotation.cutOverSize();
         fieldInfoList.add(fieldInfo);
         return true;
     }
@@ -151,17 +94,13 @@ public class TypeSerializableTable<T> {
         }
         boolean isArray = false;
         int arraySize = 0;
-        boolean cutOverSizeOfArray = false;
         byte type;
         byte componentType;
         boolean isPrimitive = true;
-        boolean cutOverSize = true;
 
         Field fieldOfArrayLength;
         Field field;
         String name;
-
-        int size = 0;
 
         @Override
         public int compareTo(Object o) {
@@ -212,10 +151,7 @@ public class TypeSerializableTable<T> {
                     break;
                 case DataType.TYPE_STRING:
                     String value = (String)fieldInfo.field.get(obj);
-                    if(value.length() > fieldInfo.size) {
-                        throw new MaxSizeExceededException("String size exceeded the length set in '" + fieldInfo.field.getName()  +"' field variable of '" + type.getName() + "' class. (" + value.length()  + "<" + fieldInfo.size + ")(x)");
-                    }
-                    serializer.putString(value, fieldInfo.size);
+                    serializer.putString(value);
                     break;
                 case DataType.TYPE_ARRAY:
                     Object arrayObject = fieldInfo.field.get(obj);
@@ -274,7 +210,7 @@ public class TypeSerializableTable<T> {
                     System.out.print("long->");
                     break;
                 case DataType.TYPE_STRING:
-                    String str = deserializer.getString(fieldInfo.size);
+                    String str = deserializer.getString();
                     fieldInfo.field.set(obj,str);
                     break;
                 case DataType.TYPE_BYTE_ARRAY:
