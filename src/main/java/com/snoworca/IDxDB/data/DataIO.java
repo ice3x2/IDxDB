@@ -1,14 +1,11 @@
 package com.snoworca.IDxDB.data;
 
-import com.snoworca.IDxDB.util.NumberBufferConverter;
+import com.snoworca.IDxDB.exception.AccessOutOfRangePositionDataException;
 
-import javax.xml.crypto.Data;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  *
@@ -16,7 +13,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class DataIO {
 
     private int readerCapacity = 3;
-    private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     private File file;
     private ConcurrentLinkedDeque<DataReader> dataReaderDeque = new ConcurrentLinkedDeque<>();
     private DataWriter dataWriter;
@@ -53,9 +49,12 @@ public class DataIO {
     }
 
     public DataBlock get(long pos) throws IOException {
+        if(pos >= dataWriter.length()) {
+            throw new AccessOutOfRangePositionDataException(dataWriter.length(), pos);
+        }
+
+
         DataReader reader = dataReaderDeque.pollFirst();
-        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
-        readLock.lock();
         try {
             if(pos >= dataWriter.length()) {
                 return null;
@@ -66,8 +65,6 @@ public class DataIO {
             return dataBlock;
         } catch (IOException | RuntimeException e) {
             throw e;
-        } finally {
-            readLock.unlock();
         }
     }
 
@@ -120,21 +117,16 @@ public class DataIO {
         return write(DataBlock.newDataBlock(buffer));
     }
     private DataBlock write(DataBlock dataBlock) throws IOException {
-        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
-        lock.lock();
         try {
             dataWriter.write(dataBlock);
             return dataBlock;
         } catch (IOException | RuntimeException e) {
             throw e;
         } finally {
-            lock.unlock();
         }
     }
 
     public void close() {
-        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
-        lock.lock();
         try {
             dataWriter.close();
             Iterator<DataReader> iterator = dataReaderDeque.iterator();
@@ -146,7 +138,6 @@ public class DataIO {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            lock.unlock();
         }
 
     }

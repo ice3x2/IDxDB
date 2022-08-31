@@ -15,7 +15,7 @@ class DataIOTest {
     private static String makeRandomString() {
         int leftLimit = 97; // letter 'a'
         int rightLimit = 122; // letter 'z'
-        int targetStringLength = 4096 - 13;///ThreadLocalRandom.current().nextInt(3000) + 5;
+        int targetStringLength = 2000 - 13;///ThreadLocalRandom.current().nextInt(3000) + 5;
         Random random = new Random();
         StringBuilder buffer = new StringBuilder(targetStringLength);
         for (int i = 0; i < targetStringLength; i++) {
@@ -55,6 +55,7 @@ class DataIOTest {
 
     }
 
+
     @Test
     void writeAndRandomGet() throws IOException {
         String randomString = makeRandomString();
@@ -67,7 +68,7 @@ class DataIOTest {
         HashMap<Long, DataBlock> dataBlockHashMap = new HashMap<>();
 
 
-        for (int i = 0; i < 100000; ++i) {
+        for (int i = 0; i < 1000; ++i) {
             DataBlock wroteDataBlock = dataIO.write(randomString);
             dataBlocks.add(wroteDataBlock);
             dataBlockHashMap.put(wroteDataBlock.getPos(), wroteDataBlock);
@@ -107,7 +108,7 @@ class DataIOTest {
         ArrayList<DataBlock> dataBlocks = new ArrayList<>();
 
         long start = System.currentTimeMillis();
-        for (int i = 0; i < 10000; ++i) {
+        for (int i = 0; i < 1000; ++i) {
             DataBlock wroteDataBlock = dataIO.write(randomString);
             dataBlocks.add(wroteDataBlock);
             /*if( i % 10000 == 0) {

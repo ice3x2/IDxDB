@@ -1,4 +1,4 @@
-package com.snoworca.StreamDB.serialization;
+package com.snoworca.IDxDB.serialization;
 
 public class InvalidTypeException extends RuntimeException {
     InvalidTypeException(String message) {

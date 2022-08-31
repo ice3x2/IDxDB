@@ -1,8 +1,8 @@
 package com.snoworca.StreamDB;
 
-import com.snoworca.StreamDB.serialization.DataSerializable;
-import com.snoworca.StreamDB.serialization.Deserializer;
-import com.snoworca.StreamDB.serialization.Serializer;
+import com.snoworca.IDxDB.serialization.DataSerializable;
+import com.snoworca.IDxDB.serialization.Deserializer;
+import com.snoworca.IDxDB.serialization.Serializer;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;

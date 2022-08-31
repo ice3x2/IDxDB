@@ -1,4 +1,4 @@
-package com.snoworca.StreamDB.serialization;
+package com.snoworca.IDxDB.serialization;
 
 public class MaxSizeExceededException extends RuntimeException {
     MaxSizeExceededException(String message) {

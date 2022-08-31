@@ -1,10 +1,9 @@
-package com.snoworca.StreamDB.serialization;
+package com.snoworca.IDxDB.serialization;
 
 import com.snoworca.IDxDB.util.ByteBufferOutputStream;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 public class Serializer {
 

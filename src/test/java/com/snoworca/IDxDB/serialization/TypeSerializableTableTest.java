@@ -1,4 +1,4 @@
-package com.snoworca.StreamDB.serialization;
+package com.snoworca.IDxDB.serialization;
 
 import org.junit.jupiter.api.Test;
 
