@@ -95,7 +95,7 @@ public class DataBlock {
 
     public static DataBlock newDataBlock(byte[] buffer) {
         DataBlock dataPayload = new DataBlock();
-        dataPayload.header = new DataBlockHeader(DataType.TYPE_BYTE_ARRAY, buffer.length);
+        dataPayload.header = new DataBlockHeader(DataType.TYPE_ARRAY, buffer.length);
         dataPayload.data = buffer;
         return dataPayload;
     }
@@ -131,8 +131,6 @@ public class DataBlock {
                 return NumberBufferConverter.toLong(data);
             case DataType.TYPE_DOUBLE:
                 return NumberBufferConverter.toDouble(data);
-            case DataType.TYPE_BYTE_ARRAY:
-                return data;
             case DataType.TYPE_STRING:
                 return new String(data, StandardCharsets.UTF_8);
         }

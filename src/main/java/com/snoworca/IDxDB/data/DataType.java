@@ -1,5 +1,7 @@
 package com.snoworca.IDxDB.data;
 
+import java.util.Collection;
+
 public interface DataType {
     public final static byte TYPE_NULL = 0;
     public final static byte TYPE_BYTE = 1;
@@ -11,48 +13,43 @@ public interface DataType {
     public final static byte TYPE_DOUBLE = 7;
     public final static byte TYPE_BOOLEAN = 8;
     public final static byte TYPE_STRING = 9;
-
-    public final static byte TYPE_BYTE_ARRAY = 10;
-
     public final static byte TYPE_ARRAY = 12;
+    public final static byte TYPE_COLLECTION = 13;
     public final static byte TYPE_OBJECT = 30;
 
     public static byte getDataType(Class<?> type) {
-        if(Byte.TYPE.isAssignableFrom(type)) {
+        if(Byte.TYPE.isAssignableFrom(type) || Byte.class.isAssignableFrom(type)) {
             return DataType.TYPE_BYTE;
         }
-        else if(Boolean.TYPE.isAssignableFrom(type)) {
+        else if(Boolean.TYPE.isAssignableFrom(type) || Boolean.class.isAssignableFrom(type)) {
             return DataType.TYPE_BOOLEAN;
         }
-        else if(Short.TYPE.isAssignableFrom(type)) {
+        else if(Short.TYPE.isAssignableFrom(type) || Short.class.isAssignableFrom(type)) {
             return DataType.TYPE_SHORT;
         }
-        else if(Character.TYPE.isAssignableFrom(type)) {
+        else if(Character.TYPE.isAssignableFrom(type) || Character.class.isAssignableFrom(type)) {
             return DataType.TYPE_CHAR;
         }
-        else if(Integer.TYPE.isAssignableFrom(type)) {
+        else if(Integer.TYPE.isAssignableFrom(type) || Integer.class.isAssignableFrom(type) ) {
             return DataType.TYPE_INT;
         }
-        else if(Float.TYPE.isAssignableFrom(type)) {
+        else if(Float.TYPE.isAssignableFrom(type) || Float.class.isAssignableFrom(type)) {
             return DataType.TYPE_FLOAT;
         }
-        else if(Long.TYPE.isAssignableFrom(type)) {
+        else if(Long.TYPE.isAssignableFrom(type) || Long.class.isAssignableFrom(type)) {
             return DataType.TYPE_LONG;
         }
-        else if(Double.TYPE.isAssignableFrom(type)) {
+        else if(Double.TYPE.isAssignableFrom(type) || Double.class.isAssignableFrom(type)) {
             return DataType.TYPE_DOUBLE;
         }
-        else if(CharSequence.class.isAssignableFrom(type)) {
-            return DataType.TYPE_STRING;
-        }
-        else if(CharSequence.class.isAssignableFrom(type)) {
-            return DataType.TYPE_STRING;
-        }
-        else if(CharSequence.class.isAssignableFrom(type)) {
+        else if(String.class.isAssignableFrom(type)) {
             return DataType.TYPE_STRING;
         }
         else if(type.isArray()) {
             return DataType.TYPE_ARRAY;
+        }
+        else if(Collection.class.isAssignableFrom(type)) {
+            return DataType.TYPE_COLLECTION;
         }
 
         return -1;

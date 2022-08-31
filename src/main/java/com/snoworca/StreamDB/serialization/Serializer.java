@@ -56,6 +56,10 @@ public class Serializer {
     }
 
     public Serializer putString(String value) {
+        if(value == null) {
+            putInteger(-1);
+            return this;
+        }
         byte[] buffer = value.getBytes(StandardCharsets.UTF_8);
         putInteger(buffer.length);
         byteBufferOutputStream.write(buffer, 0, buffer.length);
@@ -72,6 +76,11 @@ public class Serializer {
         }
         byteBufferOutputStream.writeInt(value.length);
         byteBufferOutputStream.write(value, 0, value.length);
+        return this;
+    }
+
+    public Serializer putByteArray(byte[] value,int offset,int length) {
+        byteBufferOutputStream.write(value, offset, length);
         return this;
     }
 

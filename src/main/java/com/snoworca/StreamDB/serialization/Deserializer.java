@@ -121,6 +121,18 @@ public class Deserializer {
         return new String(buffer, StandardCharsets.UTF_8);
     }
 
+
+    public byte[] getBuffer(int len) {
+        if(remaining < len) {
+            byte[] buffer = getBridgeBuffer(len);
+            return buffer;
+        }
+        byte[] buffer = new byte[len];
+        currentBuffer.get(buffer, 0, len);
+        remaining -= len;
+        return buffer;
+    }
+
     public byte[] getBuffer() {
         int len = getInt();
         if(len < 0) return null;
@@ -135,7 +147,6 @@ public class Deserializer {
         currentBuffer.get(buffer, 0, len);
         remaining -= len;
         return buffer;
-
     }
 
 
