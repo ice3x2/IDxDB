@@ -2,7 +2,6 @@ package com.snoworca.IDxDB.serialization;
 
 import com.snoworca.IDxDB.data.DataType;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -10,7 +9,7 @@ import java.lang.reflect.ParameterizedType;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-public class TypeSerializableTable<T> {
+public class SerializableTypeTable<T> {
 
     private Class<T> type = null;
     private String name = null;
@@ -19,23 +18,23 @@ public class TypeSerializableTable<T> {
     private ArrayList<FieldInfo> fieldInfoList  = null;
 
 
-    private TypeSerializableTable() {
+    private SerializableTypeTable() {
 
     }
 
 
-    public static <T> TypeSerializableTable newTable(Class<T> type) {
-        TypeSerializableTable typeSerializableTable = new TypeSerializableTable();
+    public static <T> SerializableTypeTable newTable(Class<T> type) {
+        SerializableTypeTable serializableTypeTable = new SerializableTypeTable();
         Serializable serializable =type.getAnnotation(Serializable.class);
         if(serializable == null) return null;
-        typeSerializableTable.name = !serializable.value().isEmpty() ? serializable.value() :
+        serializableTypeTable.name = !serializable.value().isEmpty() ? serializable.value() :
                                      !serializable.name().isEmpty() ? serializable.name() : type.getName();
 
-        typeSerializableTable.bufferSize = serializable.bufferSize();
-        typeSerializableTable.type = type;
-        typeSerializableTable.initFields(type);
+        serializableTypeTable.bufferSize = serializable.bufferSize();
+        serializableTypeTable.type = type;
+        serializableTypeTable.initFields(type);
 
-        return typeSerializableTable;
+        return serializableTypeTable;
     }
 
     private void initFields(Class<T> type) {
@@ -512,15 +511,22 @@ public class TypeSerializableTable<T> {
         return collection;
     }
 
-
-
-    private static Annotation findAnnotation(Annotation[] annotations,Class<? extends  Annotation> annotationType ) {
-        for(int i = 0, n = annotations.length; i < n; ++i) {
-            if(annotations[i].annotationType() == annotationType) {
-                return annotations[i];
+    public Field findFieldByName(String name) {
+        for(int i = 0, n = fieldInfoList.size(); i < n; ++i) {
+            FieldInfo info = fieldInfoList.get(i);
+            if(name.equals(info.name)) {
+                return info.field;
             }
         }
         return null;
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public Class<?> getType() {
+        return this.type;
     }
 
 }

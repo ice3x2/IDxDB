@@ -1,29 +1,47 @@
 package com.snoworca.IDxDB.scheme;
 
-import com.snoworca.IDxDB.serialization.TypeSerializableTable;
+import com.snoworca.IDxDB.exception.UnserializableTypeException;
+import com.snoworca.IDxDB.serialization.SerializableTypeTable;
 
-import java.io.File;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Schemes {
 
-    public final static Schemes newInstance(File file) {
+    private ConcurrentHashMap<String, SerializableTypeTable> tableMapByClassName = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, SerializableTypeTable> tableMapByName = new ConcurrentHashMap<>();
+    private CommitLoadDelegator onCommitLoadDelegator;
 
-        return null;
+
+    public final static Schemes newInstance(CommitLoadDelegator commitLoadDelegator) {
+        Schemes schemes = new Schemes();
+        schemes.onCommitLoadDelegator = commitLoadDelegator;
+        return schemes;
     }
 
-    public TypeSerializableTable<?> getTableByName(String name) {
-        return null;
+    public SerializableTypeTable<?> getTableByName(String name) {
+        return tableMapByName.get(name);
     }
 
-    public TypeSerializableTable<?> getTableByClassName(String className) {
-        return null;
+    public SerializableTypeTable<?> getTableByClassName(String className) {
+        return tableMapByClassName.get(className);
     }
 
     public void newScheme(Class<?> type) {
-
+        SerializableTypeTable<?> typeTable = SerializableTypeTable.newTable(type);
+        if(typeTable == null) {
+            throw new UnserializableTypeException(type);
+        }
+        tableMapByClassName.put(typeTable.getType().getName(), typeTable);
+        tableMapByName.put(typeTable.getName(), typeTable);
     }
 
     public void commit() {
+
+    }
+
+    public void clear() {
+        tableMapByClassName.clear();
+        tableMapByName.clear();
 
     }
 
@@ -31,8 +49,10 @@ public class Schemes {
 
     }
 
-    public void close() {
 
+    public static interface CommitLoadDelegator {
+        public void onCommit(byte[] buffer);
+        public byte[] getLoad();
     }
 
 
