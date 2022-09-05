@@ -12,7 +12,7 @@ class IDxDBTest {
         //IDxDB db = IDxDBBuilder.open("./defaultTest").build();
 
         IDxDB db = new IDxDB();
-        XList<TestObject> testObjectXList = db.getOrCreateList("table");
+        XCollection<TestObject> testObjectXList = db.getOrCreateList("table");
         testObjectXList.init();
 
 

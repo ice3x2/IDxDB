@@ -1,11 +1,9 @@
 package com.snoworca.IDxDB;
 
-import java.lang.reflect.ParameterizedType;
-
 public class IDxDB {
 
-    public <E extends Object> XList<E> getOrCreateList(String name) {
-        XList<E> list = new XList<>();
+    public <E extends Object> XCollection<E> getOrCreateList(String name) {
+        XCollection<E> list = new XCollection<>();
 
 
         return list;

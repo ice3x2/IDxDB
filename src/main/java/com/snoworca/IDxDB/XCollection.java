@@ -4,11 +4,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
-public class XList<E> implements List<E> {
+public class XCollection<E> implements Collection<E> {
 
-    private LinkedList<E> elements = new LinkedList<>();
+    private ArrayList<ElementBundle<E>> elements = new ArrayList<>();
 
-    protected XList() {
+    protected XCollection() {
 
     }
 
@@ -75,10 +75,6 @@ public class XList<E> implements List<E> {
         return false;
     }
 
-    @Override
-    public boolean addAll(int index, Collection<? extends E> c) {
-        return false;
-    }
 
     @Override
     public boolean removeAll(Collection<?> c) {
@@ -95,48 +91,8 @@ public class XList<E> implements List<E> {
 
     }
 
-    @Override
-    public E get(int index) {
-        return null;
-    }
 
-    @Override
-    public E set(int index, E element) {
-        return null;
-    }
+    public void commit() {
 
-    @Override
-    public void add(int index, E element) {
-
-    }
-
-    @Override
-    public E remove(int index) {
-        return null;
-    }
-
-    @Override
-    public int indexOf(Object o) {
-        return 0;
-    }
-
-    @Override
-    public int lastIndexOf(Object o) {
-        return 0;
-    }
-
-    @Override
-    public ListIterator<E> listIterator() {
-        return null;
-    }
-
-    @Override
-    public ListIterator<E> listIterator(int index) {
-        return null;
-    }
-
-    @Override
-    public List<E> subList(int fromIndex, int toIndex) {
-        return null;
     }
 }
