@@ -25,9 +25,10 @@ class SchemesTest {
                 }
 
                 @Override
-                public byte[] getLoad() {
+                public byte[] getSchemeBuffer() {
                     return commitBuffer;
                 }
+
             });
 
             schemes.newScheme(TestClassA.class);
