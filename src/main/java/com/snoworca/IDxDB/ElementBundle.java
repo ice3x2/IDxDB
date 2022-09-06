@@ -9,6 +9,10 @@ public class  ElementBundle<E> {
         return memElement;
     }
 
+    public E getElement() {
+        return null;
+    }
+
     public void setMemElement(E memElement) {
         this.memElement = memElement;
     }

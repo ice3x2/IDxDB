@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
-class SerializableTypeTableTest {
+class SerializableTypeTest {
 
 
     private static String makeRandomString(int minLength, int maxLength) {
@@ -30,7 +30,7 @@ class SerializableTypeTableTest {
 
     @Test
     public void serializedSerializeTes() throws Exception {
-        SerializableTypeTable<TestClass> table = SerializableTypeTable.newTable(TestClass.class);
+        SerializableType<TestClass> table = SerializableType.newTable(TestClass.class);
         TestClass originTestClass = new TestClass();
         ByteBuffer buffer = table.serialize(originTestClass);
         ArrayList<ByteBuffer> bufferList = new ArrayList<>();

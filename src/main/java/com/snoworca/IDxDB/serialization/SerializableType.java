@@ -6,7 +6,7 @@ import java.lang.reflect.*;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-public class SerializableTypeTable<T> {
+public class SerializableType<T> {
 
     private Class<T> type = null;
     private String name = null;
@@ -17,24 +17,26 @@ public class SerializableTypeTable<T> {
     private ArrayList<FieldInfo> fieldInfoList  = null;
 
 
-    private SerializableTypeTable() {
+    private SerializableType() {
 
     }
 
 
-    public static <T> SerializableTypeTable newTable(Class<T> type) {
-        SerializableTypeTable serializableTypeTable = new SerializableTypeTable();
+
+
+    public static <T> SerializableType newTable(Class<T> type) {
+        SerializableType serializableType = new SerializableType();
         Serializable serializable = type.getAnnotation(Serializable.class);
         if(serializable == null) return null;
-        serializableTypeTable.name = !serializable.value().isEmpty() ? serializable.value() :
+        serializableType.name = !serializable.value().isEmpty() ? serializable.value() :
                                      !serializable.name().isEmpty() ? serializable.name() : type.getName();
 
-        serializableTypeTable.bufferSize = serializable.bufferSize();
-        serializableTypeTable.type = type;
-        serializableTypeTable.version = serializable.version();
-        serializableTypeTable.initFields(type);
+        serializableType.bufferSize = serializable.bufferSize();
+        serializableType.type = type;
+        serializableType.version = serializable.version();
+        serializableType.initFields(type);
 
-        return serializableTypeTable;
+        return serializableType;
     }
 
     private void initFields(Class<T> type) {
@@ -73,8 +75,6 @@ public class SerializableTypeTable<T> {
 
 
 
-
-
     public ByteBuffer serialize(T obj) throws IllegalAccessException {
         Serializer serializer = new Serializer(bufferSize);
         for(int i = 0, n = fieldInfoList.size(); i < n; ++i) {
@@ -84,34 +84,27 @@ public class SerializableTypeTable<T> {
             switch (dataType) {
                 case DataType.TYPE_BYTE:
                     serializer.putByte(field.getByte(obj));
-                    System.out.print("byte->");
                     break;
                 case DataType.TYPE_BOOLEAN:
                     serializer.putBoolean(field.getBoolean(obj));
-                    System.out.print("boolean->");
                     break;
                 case DataType.TYPE_SHORT:
                     serializer.putShort(field.getShort(obj));
-                    System.out.print("short->");
                     break;
                 case DataType.TYPE_CHAR:
                     serializer.putCharacter(field.getChar(obj));
-                    System.out.print("char->");
                     break;
                 case DataType.TYPE_INT:
                     serializer.putInteger(field.getInt(obj));
-                    System.out.print("integer->");
                     break;
                 case DataType.TYPE_FLOAT:
                     serializer.putFloat(field.getFloat(obj));
                     break;
                 case DataType.TYPE_LONG:
                     serializer.putLong(field.getLong(obj));
-                    System.out.print("long->");
                     break;
                 case DataType.TYPE_DOUBLE:
                     serializer.putDouble(field.getDouble(obj));
-                    System.out.print("double->");
                     break;
                 case DataType.TYPE_STRING:
                     String value = (String)field.get(obj);
@@ -127,7 +120,6 @@ public class SerializableTypeTable<T> {
                     break;
             }
         }
-        System.out.println("end");
         ByteBuffer buffer = serializer.getByteBuffer();
         return buffer;
     }
@@ -449,8 +441,65 @@ public class SerializableTypeTable<T> {
         return collection;
     }
 
+
+
+    private ArrayList<Object> getValueList(T obj) throws IllegalAccessException {
+        ArrayList<Object> values = new ArrayList<>();
+        for(int i = 0, n = fieldInfoList.size(); i < n; ++i) {
+            FieldInfo fieldInfo = fieldInfoList.get(i);
+            byte dataType = fieldInfo.getType();
+            Field field = fieldInfo.getField();
+            switch (dataType) {
+                case DataType.TYPE_BYTE:
+                    values.add(field.getByte(obj));
+                    break;
+                case DataType.TYPE_BOOLEAN:
+                    values.add(field.getBoolean(obj));
+                    break;
+                case DataType.TYPE_SHORT:
+                    values.add(field.getShort(obj));
+                    break;
+                case DataType.TYPE_CHAR:
+                    values.add(field.getChar(obj));
+                    break;
+                case DataType.TYPE_INT:
+                    values.add(field.getInt(obj));
+                    break;
+                case DataType.TYPE_FLOAT:
+                    values.add(field.getFloat(obj));
+                    break;
+                case DataType.TYPE_LONG:
+                    values.add(field.getLong(obj));
+                    break;
+                case DataType.TYPE_DOUBLE:
+                    values.add(field.getDouble(obj));
+                    break;
+                case DataType.TYPE_STRING:
+                    String value = (String)field.get(obj);
+                    values.add(value);
+                    break;
+                case DataType.TYPE_ARRAY:
+                case DataType.TYPE_COLLECTION:
+                    Object arrayObject = field.get(obj);
+                    values.add(arrayObject);
+                    break;
+            }
+        }
+        return values;
+    }
+
+
     public ArrayList<FieldInfo> getFieldInfoList() {
         return new ArrayList<>(fieldInfoList);
+    }
+
+    public ArrayList<Object> getFieldValueList(T object) {
+        if(object.getClass() != type) return null;
+        try {
+            return getValueList(object);
+        } catch (IllegalAccessException e) {
+            return null;
+        }
     }
 
 

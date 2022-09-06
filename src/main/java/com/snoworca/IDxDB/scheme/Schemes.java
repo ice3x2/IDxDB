@@ -2,7 +2,7 @@ package com.snoworca.IDxDB.scheme;
 
 import com.snoworca.IDxDB.exception.UnserializableTypeException;
 import com.snoworca.IDxDB.serialization.FieldInfo;
-import com.snoworca.IDxDB.serialization.SerializableTypeTable;
+import com.snoworca.IDxDB.serialization.SerializableType;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
@@ -12,9 +12,31 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Schemes {
 
-    private ConcurrentHashMap<String, SerializableTypeTable> tableMapByClassName = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<String, SerializableTypeTable> tableMapByName = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, SerializableType> tableMapByClassName = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, SerializableType> tableMapByName = new ConcurrentHashMap<>();
     private CommitLoadDelegator onCommitLoadDelegator;
+
+
+    /*public final boolean equalObject(Object obj1, Object obj2) {
+        if(obj1.equals(obj2)) {
+            return true;
+        }
+        if(obj1.getClass() != obj2.getClass()) {
+            return false;
+        }
+        SerializableType<?> serializableType = getTableByClassName(obj1.getClass().getName());
+        if(serializableType == null) {
+            try {
+                serializableType = newScheme(obj1.getClass());
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        commit();
+    }*/
+
+
+
 
 
     public final static Schemes newInstance(CommitLoadDelegator commitLoadDelegator) {
@@ -23,27 +45,28 @@ public class Schemes {
         return schemes;
     }
 
-    public SerializableTypeTable<?> getTableByName(String name) {
+    public SerializableType<?> getTableByName(String name) {
         return tableMapByName.get(name);
     }
 
-    public SerializableTypeTable<?> getTableByClassName(String className) {
+    public SerializableType<?> getTableByClassName(String className) {
         return tableMapByClassName.get(className);
     }
 
-    public void newScheme(Class<?> type) {
-        SerializableTypeTable<?> typeTable = SerializableTypeTable.newTable(type);
+    public SerializableType<?> newScheme(Class<?> type) {
+        SerializableType<?> typeTable = SerializableType.newTable(type);
         if(typeTable == null) {
             throw new UnserializableTypeException(type);
         }
         tableMapByClassName.put(typeTable.getType().getName(), typeTable);
         tableMapByName.put(typeTable.getName(), typeTable);
+        return typeTable;
     }
 
     public void commit() {
-        Collection<SerializableTypeTable> tables = tableMapByClassName.values();
+        Collection<SerializableType> tables = tableMapByClassName.values();
         CSONArray csonArray = new CSONArray();
-        for(SerializableTypeTable table : tables) {
+        for(SerializableType table : tables) {
             CSONObject csonObject = serializableTypeTableToCSonObject(table);
             csonArray.add(csonObject);
         }
@@ -51,7 +74,7 @@ public class Schemes {
         onCommitLoadDelegator.onCommit(buffer);
     }
 
-    private CSONObject serializableTypeTableToCSonObject(SerializableTypeTable table) {
+    private CSONObject serializableTypeTableToCSonObject(SerializableType table) {
         CSONObject csonObject = new CSONObject();
         csonObject.put("class", table.getType().getName());
         csonObject.put("name", table.getName());
@@ -83,15 +106,15 @@ public class Schemes {
 
     public void load() {
         byte[] buffer = onCommitLoadDelegator.getSchemeBuffer();
-        ConcurrentHashMap<String, SerializableTypeTable> tableMapByClassName = new ConcurrentHashMap<>();
-        ConcurrentHashMap<String, SerializableTypeTable> tableMapByName = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, SerializableType> tableMapByClassName = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, SerializableType> tableMapByName = new ConcurrentHashMap<>();
         CSONArray csonArray = CSONArray.parse(buffer);
         for(int i = 0, n = csonArray.size(); i < n; ++i) {
             CSONObject csonObject = csonArray.optObject(i);
             if(csonObject == null) continue;;
             try {
                 Class<?> type = Class.forName(csonObject.optString("class"));
-                SerializableTypeTable<?> table = SerializableTypeTable.newTable(type);
+                SerializableType<?> table = SerializableType.newTable(type);
                 //TODO 마이그레이션 구현해야함.
                 tableMapByClassName.put(type.getName(), table);
                 tableMapByName.put(table.getName(), table);

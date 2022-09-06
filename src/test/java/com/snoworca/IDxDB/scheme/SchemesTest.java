@@ -3,7 +3,7 @@ package com.snoworca.IDxDB.scheme;
 import com.snoworca.IDxDB.exception.UnserializableTypeException;
 import com.snoworca.IDxDB.serialization.Column;
 import com.snoworca.IDxDB.serialization.Serializable;
-import com.snoworca.IDxDB.serialization.SerializableTypeTable;
+import com.snoworca.IDxDB.serialization.SerializableType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -51,16 +51,16 @@ class SchemesTest {
         schemes.commit();
 
 
-        SerializableTypeTable tableA = schemes.getTableByClassName(TestClassA.class.getName());
+        SerializableType tableA = schemes.getTableByClassName(TestClassA.class.getName());
         assertEquals(TestClassA.class, tableA.getType());
         tableA = schemes.getTableByName(TestClassA.class.getName());
         assertEquals(TestClassA.class, tableA.getType());
-        SerializableTypeTable tableB = schemes.getTableByClassName(TestClassB.class.getName());
+        SerializableType tableB = schemes.getTableByClassName(TestClassB.class.getName());
         assertEquals(TestClassB.class, tableB.getType());
         tableB = schemes.getTableByName("B");
         assertEquals(TestClassB.class, tableB.getType());
 
-        SerializableTypeTable tableC2 = schemes.getTableByClassName(TestClassC2.class.getName());
+        SerializableType tableC2 = schemes.getTableByClassName(TestClassC2.class.getName());
         assertEquals(TestClassC2.class, tableC2.getType());
         tableC2 = schemes.getTableByName("C2");
         assertEquals(TestClassC2.class, tableC2.getType());
