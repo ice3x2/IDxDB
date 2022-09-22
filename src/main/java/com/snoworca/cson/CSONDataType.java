@@ -18,7 +18,8 @@ class CSONDataType {
 	protected final static byte TYPE_FLOAT = 0x0A;
 	protected final static byte TYPE_LONG = 0x0B;
 	protected final static byte TYPE_DOUBLE = 0x0C;
-	protected final static byte TYPE_NULL = 0x0D;
+	protected final static byte TYPE_BIGDECIMAL = 0x0D;
+	protected final static byte TYPE_NULL = 0x0E;
 	
 	protected final static byte TYPE_STRING_SHORT = (byte)0xA0;
 	protected final static byte TYPE_STRING_MIDDLE = (byte)0xB0;

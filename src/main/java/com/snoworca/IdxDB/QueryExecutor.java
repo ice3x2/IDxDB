@@ -55,11 +55,11 @@ public class QueryExecutor {
         if(store.getSet(name) != null) {
             return makeErrorJSONObject("A set with the name '" + name + "' already exists.");
         }
-        IdxDB.SetBuilder setBuilder = store.newSetBuilder(name).memCacheSize(limit);
+        IdxDB.IndexTreeBuilder indexTreeBuilder = store.newIndexTreeBuilder(name).memCacheSize(limit);
         String firstIndexKey = index.keys().next();
         int sortMethod = index.optInt(firstIndexKey, 1);
-        setBuilder.index(firstIndexKey, sortMethod);
-        setBuilder.create();
+        indexTreeBuilder.index(firstIndexKey, sortMethod);
+        indexTreeBuilder.create();
         return new JSONObject().put("isError", false).put("success", true).put("message", "ok");
     }
 

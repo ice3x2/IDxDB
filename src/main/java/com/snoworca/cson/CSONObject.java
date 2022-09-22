@@ -1,18 +1,50 @@
 package com.snoworca.cson;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.Map.Entry;
 
 public class CSONObject extends CSONElement {
 	
-	private LinkedHashMap<String, Object> mTree = new LinkedHashMap<>();
-	
-	
-	public static CSONObject parse(byte[] buffer) {		
-		return (CSONObject)CSONParser.parse(buffer);
+	private LinkedHashMap<String, Object> mDataMap = new LinkedHashMap<>();
+
+	public CSONObject(byte[] buffer) {
+		super(ElementType.Object);
+		CSONObject csonObject = (CSONObject)CSONParser.parse(buffer);
+		this.mDataMap = csonObject.mDataMap;
 	}
-	
+
+	protected Set<Entry<String, Object>> entrySet() {
+		return this.mDataMap.entrySet();
+	}
+
+	public Map<String, Object> toMap() {
+		Map<String, Object> results = new HashMap<String, Object>();
+		for (Entry<String, Object> entry : this.entrySet()) {
+			Object value;
+			if (entry.getValue() == null) {
+				value = null;
+			} else if (entry.getValue() instanceof JSONObject) {
+				value = ((JSONObject) entry.getValue()).toMap();
+			} else if (entry.getValue() instanceof JSONArray) {
+				value = ((JSONArray) entry.getValue()).toList();
+			} else {
+				value = entry.getValue();
+			}
+			results.put(entry.getKey(), value);
+		}
+		return results;
+	}
+
+	public CSONObject(String json) {
+		this(new JSONTokener(json));
+
+
+	}
 	
 	public CSONObject() {
 		super(ElementType.Object);
@@ -20,47 +52,51 @@ public class CSONObject extends CSONElement {
 	
 	public CSONObject put(String key, Object value) {
 		if(value == null) {
-			mTree.put(key, new NullValue());
+			mDataMap.put(key, new NullValue());
 			return this;
 		}
 		else if(value instanceof Number) {
-			mTree.put(key, value);
+			mDataMap.put(key, value);
 		} else if(value instanceof String) {
-			mTree.put(key, value);
+			mDataMap.put(key, value);
 		} else if(value instanceof CharSequence) {
-			mTree.put(key, value);
+			mDataMap.put(key, value);
 		} else if(value instanceof Character || value instanceof Boolean || value instanceof CSONElement || value instanceof byte[] || value instanceof NullValue) {
-			mTree.put(key, value);
+			mDataMap.put(key, value);
 		}
 		return this;
 	}
 	
 	
 	public String optString(String key) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		return DataConverter.toString(obj);
 	}
 	
 	public String optString(String key, String def) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		if(obj == null) return def;
 		return DataConverter.toString(obj);
 	}
+
+	public Set<String> keySet() {
+		return this.mDataMap.keySet();
+	}
 	
 	public String getString(String key) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toString(obj);
 	}
 	
 	public Object opt(String key) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		if(obj instanceof NullValue) return null;
 		return obj;
 	}
 	
 	public Object get(String i) {
-		Object obj =  mTree.get(i);
+		Object obj =  mDataMap.get(i);
 		if(obj instanceof NullValue) return null;
 		else if(obj == null) throw new CSONIndexNotFoundException();
 		return obj;
@@ -68,14 +104,14 @@ public class CSONObject extends CSONElement {
 	}
 	
 	public Object opt(String key, Object def) {
-		Object result = mTree.get(key);
+		Object result = mDataMap.get(key);
 		if(result instanceof NullValue) return null;
 		else if(result == null) return def; 
 		return result;
 	}
 	
 	public int optInteger(String key, int def) {
- 		Object obj = mTree.get(key);
+ 		Object obj = mDataMap.get(key);
  		if(obj == null) return def;
 		return DataConverter.toInteger(obj);
 	}
@@ -85,7 +121,7 @@ public class CSONObject extends CSONElement {
 	}
 	
 	public int getInteger(String key) {
- 		Object obj = mTree.get(key); 
+ 		Object obj = mDataMap.get(key);
  		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toInteger(obj);
 	}
@@ -95,13 +131,13 @@ public class CSONObject extends CSONElement {
 	}
 	
 	public float optFloat(String key, float def) {
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
  		if(obj == null) return def;
 		return DataConverter.toFloat(obj);
 	}
 	
 	public float getFloat(String key) {
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
 		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toFloat(obj);
 	}
@@ -111,38 +147,105 @@ public class CSONObject extends CSONElement {
 	}
 	
 	public boolean optBoolean(String key, boolean def) { 
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
 		if(obj  == null) return def;
 		return DataConverter.toBoolean(obj);
 	}
 	
 	public boolean getBoolean(String key) { 
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
 		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toBoolean(obj);
 	}
+
+	protected CSONObject(JSONTokener x) throws CSONException {
+		super(ElementType.Object);
+		char c;
+		String key;
+
+		if (x.nextClean() != '{') {
+			throw x.syntaxError("A JSONObject text must begin with '{'");
+		}
+		for (;;) {
+			char prev = x.getPrevious();
+			c = x.nextClean();
+			switch (c) {
+				case 0:
+					throw x.syntaxError("A JSONObject text must end with '}'");
+				case '}':
+					return;
+				case '{':
+				case '[':
+					if(prev=='{') {
+						throw x.syntaxError("A JSON Object can not directly nest another JSON Object or JSON Array.");
+					}
+					// fall through
+				default:
+					x.back();
+					key = x.nextValue().toString();
+			}
+
+			// The key is followed by ':'.
+
+			c = x.nextClean();
+			if (c != ':') {
+				throw x.syntaxError("Expected a ':' after a key");
+			}
+
+			// Use syntaxError(..) to include error location
+
+			if (key != null) {
+				// Check if key exists
+				if (this.opt(key) != null) {
+					// key already exists
+					throw x.syntaxError("Duplicate key \"" + key + "\"");
+				}
+				// Only add value if non-null
+				Object value = x.nextValue();
+				if (value!=null) {
+					this.put(key, value);
+				}
+			}
+
+			// Pairs are separated by ','.
+
+			switch (x.nextClean()) {
+				case ';':
+				case ',':
+					if (x.nextClean() == '}') {
+						return;
+					}
+					x.back();
+					break;
+				case '}':
+					return;
+				default:
+					throw x.syntaxError("Expected a ',' or '}'");
+			}
+		}
+	}
 	
 	public long getLong(String key) { 
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
 		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toLong(obj);
 	}
 	
 	public double getDouble(String key) { 
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
 		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toDouble(obj);
 	}
 	
 	public char getChar(String key) { 
-		Object obj = mTree.get(key); 
+		Object obj = mDataMap.get(key);
 		if(obj == null) throw new CSONIndexNotFoundException();
 		return DataConverter.toChar(obj);
 	}
 	
 	
 	public CSONArray optArray(String key) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		if(obj instanceof CSONArray) {
 			return (CSONArray)obj;
 		}
@@ -150,8 +253,8 @@ public class CSONObject extends CSONElement {
 	}
 	
 	
-	public CSONArray getArray(String key) {
-		Object obj = mTree.get(key);
+	public CSONArray getCSONArray(String key) {
+		Object obj = mDataMap.get(key);
 		if(obj instanceof CSONArray) {
 			return (CSONArray)obj;
 		}
@@ -159,7 +262,7 @@ public class CSONObject extends CSONElement {
 	}
 	
 	public CSONObject optObject(String key) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		if(obj instanceof CSONObject) {
 			return (CSONObject)obj;
 		}
@@ -167,7 +270,7 @@ public class CSONObject extends CSONElement {
 	}
 	
 	public CSONObject getObject(String key) {
-		Object obj = mTree.get(key);
+		Object obj = mDataMap.get(key);
 		if(obj instanceof CSONObject) {
 			return (CSONObject)obj;
 		}
@@ -188,7 +291,7 @@ public class CSONObject extends CSONElement {
 	}
 	
 	protected void write(CSONWriter writer) {
-		Iterator<Entry<String, Object>> iter = mTree.entrySet().iterator();
+		Iterator<Entry<String, Object>> iter = mDataMap.entrySet().iterator();
 		writer.openObject();
 		while(iter.hasNext()) {
 			Entry<String, Object> entry = iter.next();
@@ -212,6 +315,7 @@ public class CSONObject extends CSONElement {
 			else if(obj instanceof Double) writer.key(key).value((Double)obj);
 			else if(obj instanceof String) writer.key(key).value((String)obj);
 			else if(obj instanceof Boolean) writer.key(key).value((Boolean)obj);
+			else if(obj instanceof BigDecimal) writer.key(key).value(((BigDecimal)obj));
 			else if(obj instanceof byte[]) writer.key(key).value((byte[])obj);
 		}
 		writer.closeObject();
@@ -221,7 +325,7 @@ public class CSONObject extends CSONElement {
 		
 		strBuilder.append("{");
 		
-		Iterator<Entry<String, Object>> iter = mTree.entrySet().iterator();
+		Iterator<Entry<String, Object>> iter = mDataMap.entrySet().iterator();
 		while(iter.hasNext()) {
 			Entry<String, Object> entry = iter.next();
 			String key = entry.getKey();

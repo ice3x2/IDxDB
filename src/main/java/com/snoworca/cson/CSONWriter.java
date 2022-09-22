@@ -2,7 +2,9 @@ package com.snoworca.cson;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 
 
@@ -15,17 +17,16 @@ public class CSONWriter {
 	private ByteArrayOutputStream mBufferStream = new ByteArrayOutputStream(DEFAULT_BUFFER_SIZE);
 	
 	
-	
-	private Charset mUTF8;
-	
+
 	public CSONWriter() {
 		mTypeStack.addLast(ObjectType.None);
-		mUTF8 = Charset.forName("UTF-8");
 		try {
 			mBufferStream.write(CSONDataType.TYPE_HEADER);
 			mBufferStream.write(CSONDataType.VER);
 		} catch (IOException ignored) {}
 	}
+
+
 	
 	
 	private void writeString(byte[] buffer) {
@@ -101,7 +102,6 @@ public class CSONWriter {
 				writeInt(buffer.length);				
 				mBufferStream.write(type);
 		}
-		
 		mBufferStream.write(buffer, 0 ,buffer.length );
 	}
 	
@@ -147,7 +147,7 @@ public class CSONWriter {
 			throw new CSONWriteException();
 		}
 		mTypeStack.addLast(ObjectType.ObjectKey);
-		writeString((key + "").getBytes(mUTF8));
+		writeString((key + "").getBytes(StandardCharsets.UTF_8));
 		return this;
 	 }
 	
@@ -156,7 +156,7 @@ public class CSONWriter {
 			 throw new CSONWriteException();
 		 }
 		 mTypeStack.addLast(ObjectType.ObjectKey);
-		 writeString(key.getBytes(mUTF8));
+		 writeString(key.getBytes(StandardCharsets.UTF_8));
 		 return this;
 	 }
 	 
@@ -179,7 +179,7 @@ public class CSONWriter {
 			 throw new CSONWriteException();
 		 }
 		 mTypeStack.removeLast();
-		 writeString(value.getBytes(mUTF8));
+		 writeString(value.getBytes(StandardCharsets.UTF_8));
 		 return this;
 	 }
 	 
@@ -188,7 +188,6 @@ public class CSONWriter {
 			 nullValue();
 			 return this;
 		 }
-		 
 		 if(mTypeStack.getLast() != ObjectType.ObjectKey) {
 			 throw new CSONWriteException();
 		 }
@@ -196,6 +195,20 @@ public class CSONWriter {
 		 writeBuffer(value);
 		 return this;
 	 }
+
+	public CSONWriter value(BigDecimal value) {
+		if(value== null) {
+			nullValue();
+			return this;
+		}
+		if(mTypeStack.getLast() != ObjectType.ObjectKey) {
+			throw new CSONWriteException();
+		}
+		mTypeStack.removeLast();
+		mBufferStream.write(CSONDataType.TYPE_BIGDECIMAL);
+		writeString(value.toString().getBytes(StandardCharsets.UTF_8));
+		return this;
+	}
 	 
 	 public CSONWriter value(byte value) {
 		 if(mTypeStack.getLast() != ObjectType.ObjectKey) {
@@ -295,7 +308,7 @@ public class CSONWriter {
 		 if(mTypeStack.getLast() != ObjectType.Array) {
 			 throw new CSONWriteException();
 		 }
-		 writeString(value.getBytes(mUTF8));
+		 writeString(value.getBytes(StandardCharsets.UTF_8));
 		 return this;
 	 }
 	 
@@ -310,6 +323,19 @@ public class CSONWriter {
 		 writeBuffer(value);
 		 return this;
 	 }
+
+	public CSONWriter add(BigDecimal value) {
+		if(value== null) {
+			addNull();
+			return this;
+		}
+		if(mTypeStack.getLast() != ObjectType.Array) {
+			throw new CSONWriteException();
+		}
+		mBufferStream.write(CSONDataType.TYPE_BIGDECIMAL);
+		writeString(value.toString().getBytes(StandardCharsets.UTF_8));
+		return this;
+	}
 	 
 	 
 	 public CSONWriter add(byte value) {

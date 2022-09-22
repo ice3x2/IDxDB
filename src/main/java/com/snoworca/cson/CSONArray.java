@@ -1,9 +1,11 @@
 package com.snoworca.cson;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.Iterator;
+;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.*;
 
 
 public class CSONArray  extends CSONElement  implements Collection<Object> {
@@ -15,8 +17,9 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 
 	private ArrayList<Object> mList = new ArrayList<Object>();
 	
-	public static CSONArray parse(byte[] buffer) {		
-		return (CSONArray)CSONParser.parse(buffer);
+	public CSONArray(byte[] buffer) {
+		super(ElementType.Array);
+		 this.mList = ((CSONArray)CSONParser.parse(buffer)).mList;
 	}
 	
 	@Override
@@ -41,13 +44,80 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 
 	@Override
 	public Object[] toArray() {
-		return mList.toArray();
+		return toList().toArray();
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object[] toArray(Object[] a) {
-		return mList.toArray(a);
+		return toList().toArray(a);
+	}
+
+	public List<Object> toList() {
+		List<Object> results = new ArrayList<Object>(this.mList.size());
+		for (Object element : this.mList) {
+			if (element == null || JSONObject.NULL.equals(element)) {
+				results.add(null);
+			} else if (element instanceof JSONArray) {
+				results.add(((JSONArray) element).toList());
+			} else if (element instanceof JSONObject) {
+				results.add(((JSONObject) element).toMap());
+			} else {
+				results.add(element);
+			}
+		}
+		return results;
+	}
+
+
+	protected CSONArray(JSONTokener x) throws CSONException {
+		super(ElementType.Array);
+		if (x.nextClean() != '[') {
+			throw x.syntaxError("A JSONArray text must start with '['");
+		}
+
+		char nextChar = x.nextClean();
+		if (nextChar == 0) {
+			// array is unclosed. No ']' found, instead EOF
+			throw x.syntaxError("Expected a ',' or ']'");
+		}
+		if (nextChar != ']') {
+			x.back();
+			for (;;) {
+				if (x.nextClean() == ',') {
+					x.back();
+					this.mList.add(null);
+				} else {
+					x.back();
+					this.mList.add(x.nextValue());
+				}
+				switch (x.nextClean()) {
+					case 0:
+						// array is unclosed. No ']' found, instead EOF
+						throw x.syntaxError("Expected a ',' or ']'");
+					case ',':
+						nextChar = x.nextClean();
+						if (nextChar == 0) {
+							// array is unclosed. No ']' found, instead EOF
+							throw x.syntaxError("Expected a ',' or ']'");
+						}
+						if (nextChar == ']') {
+							return;
+						}
+						x.back();
+						break;
+					case ']':
+						return;
+					default:
+						throw x.syntaxError("Expected a ',' or ']'");
+				}
+			}
+		}
+	}
+
+
+	public CSONArray(String source) throws CSONException {
+		this(new JSONTokener(source));
 	}
 	
 	public CSONArray push(Object e) {
@@ -118,7 +188,7 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 		
 	}
 	
-	public CSONObject getObject(int index) {
+	public CSONObject getCSONObject(int index) {
 		try {
 			return DataConverter.toObject(mList.get(index));
 		} catch (IndexOutOfBoundsException e) {
@@ -396,7 +466,6 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 			else if(obj instanceof Number || obj instanceof Boolean) strBuilder.append(obj);
 			else if(obj instanceof Character) strBuilder.append('"').append(obj).append('"');
 			else if(obj instanceof String) strBuilder.append('"').append(DataConverter.escapeJSONString((String)obj)).append('"');
-			else if(obj instanceof byte[]) strBuilder.append('"').append(DataConverter.toString(obj)).append('"');
 			else if(obj instanceof byte[]) strBuilder.append('"').append(DataConverter.toString(obj)).append('"');
 			else if(obj instanceof CSONArray) ((CSONArray)obj).writeJSONString(strBuilder);
 			else if(obj instanceof CSONObject) ((CSONObject)obj).writeJSONString(strBuilder);

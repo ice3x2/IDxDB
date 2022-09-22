@@ -1,12 +1,17 @@
 package com.snoworca.cson;
 
+import com.sun.org.apache.bcel.internal.generic.CASTORE;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 
 public class CSONBufferReader {
 	
-	private final static Charset UTF8 = Charset.forName("UTF-8");
+	private final static Charset UTF8 = StandardCharsets.UTF_8;
 	
 	public final static void parse(byte[] buffer, ParseCallback callback) {
 		ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
@@ -108,6 +113,7 @@ public class CSONBufferReader {
 				case CSONDataType.TYPE_FLOAT:
 				case CSONDataType.TYPE_LONG:
 				case CSONDataType.TYPE_DOUBLE:
+				case CSONDataType.TYPE_BIGDECIMAL:
 				case CSONDataType.TYPE_NULL:
 					callback.onValue(readValue(valueType, byteBuffer));
 					isReadObject = true;
@@ -175,6 +181,7 @@ public class CSONBufferReader {
 				case CSONDataType.TYPE_FLOAT:
 				case CSONDataType.TYPE_LONG:
 				case CSONDataType.TYPE_DOUBLE:
+				case CSONDataType.TYPE_BIGDECIMAL:
 				case CSONDataType.TYPE_NULL:
 					callback.onValue(readValue(type, byteBuffer));
 					isReadObject = false;
@@ -197,7 +204,9 @@ public class CSONBufferReader {
 			}
 		}
 	}
-	
+
+
+
 	
 	
 	public final static Object readValue(byte type,ByteBuffer byteBuffer) {
@@ -218,8 +227,13 @@ public class CSONBufferReader {
 				return byteBuffer.getLong();
 			case CSONDataType.TYPE_DOUBLE:
 				return byteBuffer.getDouble();
+			case CSONDataType.TYPE_BIGDECIMAL:
+				byte typeOfBigDecimal = byteBuffer.get();
+				byte rawTypeOfBigDecimal = (byte)(typeOfBigDecimal & 0xF0);
+				return new BigDecimal(readString(typeOfBigDecimal,rawTypeOfBigDecimal,byteBuffer));
 			case CSONDataType.TYPE_NULL:
 				return null;
+
 			default:		
 				byte rawtype = (byte)(type & 0xF0);
 				return readStreamType(type,rawtype, byteBuffer);

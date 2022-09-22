@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class IdxDB {
@@ -25,8 +26,8 @@ public class IdxDB {
         return idxDB;
     }
 
-    public SetBuilder newSetBuilder(String name) {
-        return new SetBuilder(name);
+    public IndexTreeBuilder newIndexTreeBuilder(String name) {
+        return new IndexTreeBuilder(name);
     }
 
     public JSONObject executeQuery(JSONObject query) {
@@ -45,6 +46,7 @@ public class IdxDB {
         @Override
         public long cache(byte[] buffer) {
             try {
+
                 return dataIO.write(buffer).getPos();
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -61,36 +63,42 @@ public class IdxDB {
         }
     };
 
-    public class SetBuilder {
+    public class IndexTreeBuilder {
 
         private String name;
 
         private String indexKey = "";
         private int sort = 0;
         private int memCacheSize = Integer.MAX_VALUE;
-        //TODO 파일 저장모드와 파일 저장 delegator 를 인자로 넘겨야함.
+
         private boolean fileStoreMode = false;
 
+        private Map<String, Object> toOptionMap() {
 
 
-        SetBuilder(String name) {
+            return null;
+
+        }
+
+
+        IndexTreeBuilder(String name) {
             this.name = name;
         }
 
-        public SetBuilder setFileStore(boolean enable) {
+        public IndexTreeBuilder setFileStore(boolean enable) {
             this.fileStoreMode = enable;
             return this;
         }
 
 
-        public SetBuilder index(String key, int sort) {
+        public IndexTreeBuilder index(String key, int sort) {
             this.indexKey = key;
             this.sort = sort;
             return this;
         }
 
 
-        public SetBuilder memCacheSize(int limit) {
+        public IndexTreeBuilder memCacheSize(int limit) {
             this.memCacheSize = limit;
             return this;
         }

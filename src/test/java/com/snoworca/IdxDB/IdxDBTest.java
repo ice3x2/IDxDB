@@ -19,7 +19,7 @@ class IdxDBTest {
     public void memCacheTest() {
         File file = new File("test.db");
         IdxDB idxDB = IdxDB.create(file);
-        IndexTree set = idxDB.newSetBuilder("208300").index("dateL", 1).memCacheSize(1000).create();
+        IndexTree set = idxDB.newIndexTreeBuilder("208300").index("dateL", 1).memCacheSize(1000).create();
 
         ArrayList<JSONObject> testDatas = new ArrayList<>();
         for(int i = 0; i < 2000; ++i) {
