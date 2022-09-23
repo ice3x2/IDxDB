@@ -70,7 +70,7 @@ class IdxDBTest {
         long start = System.currentTimeMillis();
         IdxDB idxDB = IdxDB.newMaker(file).make();
         int collectionSize = 20;
-        int rowSize = 6000;
+        int rowSize = 10000;
         int memCacheSize = 1000;
         long testCase = collectionSize * rowSize;
 
@@ -125,8 +125,8 @@ class IdxDBTest {
 
         start = System.currentTimeMillis();
         csonObjectList = idxDB.get("0").list(Integer.MAX_VALUE, false);
-        assertEquals(rowSize - 600, csonObjectList.size());
-        System.out.println(csonObjectList.size() + " " + (rowSize - 600) +  "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+        assertEquals(rowSize - (10000 / 10), csonObjectList.size());
+        System.out.println(csonObjectList.size() + "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
 
 
         start = System.currentTimeMillis();
