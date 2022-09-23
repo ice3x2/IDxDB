@@ -1,7 +1,6 @@
 
 package  com.snoworca.cson;
 
-import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -491,7 +490,7 @@ public class JSONTokener {
             return Boolean.FALSE;
         }
         if ("null".equalsIgnoreCase(string)) {
-            return JSONObject.NULL;
+            return null;
         }
 
         /*

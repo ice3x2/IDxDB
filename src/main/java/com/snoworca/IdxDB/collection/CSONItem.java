@@ -1,78 +1,86 @@
 package com.snoworca.IdxDB.collection;
 
-import org.json.JSONObject;
+import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 
-class JSONItem implements Comparable<JSONItem> {
-
-    JSONItem(JSONObject jsonObject, String key, int sort) {
-        this(null, jsonObject, key, sort);
-    }
-
-    JSONItem(FileCacheDelegator fileCacheDelegator, String key, int sort) {
-        this(fileCacheDelegator,null, key, sort);
-    }
+class CSONItem implements Comparable<CSONItem> {
 
 
-    JSONItem(FileCacheDelegator fileCacheDelegator, JSONObject jsonObject, String key, int sort) {
-        this.fileCacheDelegator = fileCacheDelegator;
+
+    CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String key, int sort) {
+        this.storeDelegator = storeDelegator;
         this.indexKey = key;
         this.sort = sort;
-        this.jsonObject = jsonObject;
-        if(this.jsonObject == null && fileCacheDelegator != null) {
+        this.csonObject = csonObject;
+        if(this.csonObject == null && storeDelegator != null) {
             isFileCache = true;
         }
-        this.indexValue = jsonObject.opt(indexKey);
+        this.indexValue = csonObject.opt(indexKey);
+    }
+
+    CSONItem(StoreDelegator storeDelegator, String key,Object indexValue, int sort) {
+        this.storeDelegator = storeDelegator;
+        this.indexKey = key;
+        this.sort = sort;
+        this.csonObject = csonObject;
+        if(this.csonObject == null && storeDelegator != null) {
+            isFileCache = true;
+        }
+        this.indexValue = indexValue;
     }
 
 
-    private JSONObject jsonObject;
+    private volatile CSONObject csonObject;
     private String indexKey = null;
     private Object indexValue;
     private int sort = 0;
     private boolean isFileCache = false;
     private long filePos = -1;
-    private FileCacheDelegator fileCacheDelegator;
+    private StoreDelegator storeDelegator;
     private boolean isChanged = false;
 
 
-    public JSONObject getJsonObject() {
-        if(jsonObject == null) {
-            byte[] buffer = fileCacheDelegator.load(filePos);
-            JSONObject loadJSON = new JSONObject(new String(buffer, StandardCharsets.UTF_8));
-            if(!isFileCache) jsonObject = loadJSON;
-            else return loadJSON;
-        }
-        return jsonObject;
+    public boolean isChanged() {
+        return isChanged;
     }
 
-    public void setJsonObject(JSONObject jsonObject) {
-        this.jsonObject = jsonObject;
+    public CSONObject getCsonObject() {
+        if(csonObject == null) {
+            byte[] buffer = storeDelegator.load(filePos);
+            CSONObject loadJSON = new CSONObject(buffer);
+            if(!isFileCache) csonObject = loadJSON;
+            else return loadJSON;
+        }
+        return csonObject;
+    }
+
+    public void setCsonObject(CSONObject jsonObject) {
+        this.csonObject = jsonObject;
         this.isChanged = true;
     }
 
-    public long getFilePos() {
+    public long getStorePos() {
         return filePos;
     }
 
     public void storeFileIfNeed() {
         if(filePos > -1) return;
-        filePos = fileCacheDelegator.cache(jsonObject.toString().getBytes(StandardCharsets.UTF_8));
+        filePos = storeDelegator.cache(csonObject.toByteArray());
+        isFileCache = true;
     }
 
 
 
     public void setFileStore(boolean fileCache) {
         if(fileCache) {
-            if(!isFileCache || isChanged) {
-                filePos = fileCacheDelegator.cache(jsonObject.toString().getBytes(StandardCharsets.UTF_8));
+            if(this.csonObject != null && (!isFileCache || isChanged)) {
+                filePos = storeDelegator.cache(csonObject.toByteArray());
             }
-            this.jsonObject = null;
+            this.csonObject = null;
         }
-        else if(this.jsonObject == null) {
-            this.jsonObject = getJsonObject();
+        else if(this.csonObject == null) {
+            this.csonObject = getCsonObject();
         }
         isFileCache = fileCache;
     }
@@ -83,7 +91,7 @@ class JSONItem implements Comparable<JSONItem> {
 
 
     @Override
-    public int compareTo(JSONItem o) {
+    public int compareTo(CSONItem o) {
         Object targetObj = o.getIndexValue();
         Object thisObj = indexValue;
         if(targetObj == null && thisObj != null) {
@@ -111,11 +119,15 @@ class JSONItem implements Comparable<JSONItem> {
         return this.indexValue;
     }
 
+    public void setIndexValue(Object object) {
+        this.indexValue = object == null ? Integer.valueOf(0) : object;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if(obj == this) return true;
         else if(obj == null) return false;
-        if(obj instanceof JSONItem && compareTo((JSONItem)obj) == 0) {
+        if(obj instanceof CSONItem && compareTo((CSONItem)obj) == 0) {
             return true;
         }
         return false;
@@ -133,7 +145,7 @@ class JSONItem implements Comparable<JSONItem> {
 
     @Override
     public String toString() {
-        return jsonObject == null ? "" : jsonObject.toString();
+        return csonObject == null ? "" : csonObject.toString();
     }
 
     private static int compareTo(Number n1, Number n2) {

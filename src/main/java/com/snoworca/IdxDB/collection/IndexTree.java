@@ -2,58 +2,203 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.snoworca.IdxDB.dataStore.DataBlock;
+import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.cson.CSONArray;
+import com.snoworca.cson.CSONObject;
 
+import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-//TODO 데이터 넣을 때
 public class IndexTree implements IndexCollection{
+
+    private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+
+    private String name;
 
     private final int memCacheLimit;
     private String indexKey = "";
     private TreeSet<String> indexKeySet;
     private int indexSort = 0;
-    private TreeSet<JSONItem> itemSet = new TreeSet<>();
-    //TODO collection commands list 추가해야한다.
-    
+    private TreeSet<CSONItem> itemSet = new TreeSet<>();
+    private ConcurrentLinkedQueue<Long> removeQueue = new ConcurrentLinkedQueue<>();
+    private DataIO dataIO;
+    private StoreDelegator storeDelegator;
 
-    private FileCacheDelegator fileCacheDelegator;
+    private long lastDataStorePos = -1;
+
+    private long headPos = -1;
+    private CSONObject optionInfo;
+    private volatile boolean isChanged = false;
 
 
 
-    IndexTree(FileCacheDelegator fileCacheDelegator, Integer memCacheLimit, String indexKey, Integer indexSort) {
-        this.indexKey = indexKey;
-        this.indexSort = indexSort;
-        this.memCacheLimit = memCacheLimit;
-        this.fileCacheDelegator = fileCacheDelegator;
+    public IndexTree(DataIO dataIO, IndexTreeOption option) {
+        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        lock.lock();
+        try {
+            this.indexKey = option.getIndexKey();
+            this.indexSort = option.getIndexSort();
+            this.memCacheLimit = option.getMemCacheSize();
+            this.dataIO = option.isFileStore() ? dataIO : null;
+            this.name = option.getName();
+            if (this.dataIO != null) {
+                makeStoreDelegatorImpl();
+            }
+            this.headPos = option.getHeadPos();
+            initData();
+            optionInfo = option.toCsonObject();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public CSONObject getOptionInfo() {
+        return new CSONObject(optionInfo.toByteArray());
+    }
+
+    private void initData() {
+        try {
+            if(headPos < 1) {
+                DataBlock headBlock = dataIO.write(new byte[]{0});
+                lastDataStorePos = headPos = headBlock.getPos();
+            } else {
+                Iterator<DataBlock> dataBlockIterator = dataIO.iterator(headPos);
+                boolean header = true;
+                while(dataBlockIterator.hasNext()) {
+                    DataBlock dataBlock = dataBlockIterator.next();
+                    if(header) {
+                        header = false;
+                        continue;
+                    }
+                    byte[] buffer = dataBlock.getData();
+                    lastDataStorePos = dataBlock.getPos();
+                    CSONObject csonObject = new CSONObject(buffer);
+                    Object indexValue = csonObject.opt(indexKey);
+                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, indexSort);
+                    csonItem.setFilePos(lastDataStorePos);
+                    csonItem.setFileStore(true);
+                    itemSet.add(csonItem);
+                }
+                long count = 0;
+                for (CSONItem CSONItem : itemSet) {
+                    CSONItem.setFileStore(count > memCacheLimit);
+                    ++count;
+                }
+
+
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
+    public long getHeadPos() {
+        return headPos;
+    }
+
+
+    private void makeStoreDelegatorImpl() {
+        storeDelegator = new StoreDelegator() {
+            @Override
+            public long cache(byte[] buffer) {
+                try {
+                    DataBlock dataBlock = dataIO.write(buffer);
+                    long dataPos = dataBlock.getPos();
+                    dataIO.setNextPos(lastDataStorePos, dataPos);
+                    dataIO.setPrevPos(dataPos, lastDataStorePos);
+                    lastDataStorePos = dataPos;
+                    return dataPos;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            @Override
+            public byte[] load(long pos) {
+                try {
+                    DataBlock dataBlock = dataIO.get(pos);
+                    return dataBlock.getData();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+    }
+
+
+
+    @Override
     public int size() {
-        return itemSet.size();
+        //ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
+        lock.lock();
+        int size = itemSet.size();
+        lock.unlock();
+        return size;
     }
 
     @Override
     public synchronized void commit() {
-        if(fileCacheDelegator == null) return;
-        int count = 0;
-
-        for (JSONItem jsonItem : itemSet) {
-            jsonItem.storeFileIfNeed();
-            jsonItem.setFileStore(count < memCacheLimit);
-            ++count;
+        //TODO chagne 가 발생하지 않으면 commit 을 실행하지 않음.
+        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        //ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
+        if(!isChanged && removeQueue.isEmpty()) {
+            return;
         }
-        //TODO 1. commit 실행 순간 tree 를 모두 순회하면서 mem cache limit 보다 크면 파일로 저장. 아니면 메모리로 캐쉬해 놓음.
-        //TODO 2. 명령을 순차적으로 저장함.
+        lock.lock();
+        try {
+            int count = 0;
+            if(isChanged) {
+                for (CSONItem csonItem : itemSet) {
+                    long storePos = csonItem.getStorePos();
+                    if (csonItem.getStorePos() > 0 && csonItem.isChanged()) {
+                        try {
+                            dataIO.unlink(storePos);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        csonItem.setFilePos(-1);
+                    }
+                    csonItem.storeFileIfNeed();
+                    csonItem.setFileStore(count > memCacheLimit);
+                    ++count;
+                }
+                isChanged = false;
+            }
+            ArrayList<Long> removeList = new ArrayList<>(removeQueue);
+            removeQueue.clear();
+            for(int i = 0, n = removeList.size(); i < n; ++i) {
+                long filePos = removeList.get(i);
+                try {
+                    dataIO.unlink(filePos);
+                } catch (IOException ignored) {}
+            }
+        } finally {
+            lock.unlock();
+        }
+
 
     }
 
     @Override
     public boolean isEmpty() {
-        return itemSet.isEmpty();
+        //ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
+        lock.lock();
+        boolean isEmpty = itemSet.isEmpty();
+        lock.unlock();
+        return isEmpty;
     }
 
+
+    @Override
+    public String getName() {
+        return name;
+    }
 
     @Override
     public Set<String> indexKeys() {
@@ -65,13 +210,16 @@ public class IndexTree implements IndexCollection{
     }
 
 
-    private JSONItem getByIndexValue(Object value) {
-        return get(new JSONObject().put(indexKey, value));
+    private CSONItem getByIndexValue(Object value) {
+        return get(new CSONObject().put(indexKey, value));
     }
 
-    private JSONItem get(JSONObject jsonObject) {
-        JSONItem item = new JSONItem(jsonObject,indexKey, indexSort);
-        JSONItem foundItem = itemSet.floor(item);
+    private CSONItem get(CSONObject jsonObject) {
+        CSONItem item = new CSONItem(storeDelegator,jsonObject,indexKey, indexSort);
+        ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
+        lock.lock();
+        CSONItem foundItem = itemSet.floor(item);
+        lock.unlock();
         if(foundItem == null || !CompareUtil.compare(foundItem.getIndexValue(), jsonObject.opt(indexKey), OP.eq)) {
             return null;
         }
@@ -80,77 +228,103 @@ public class IndexTree implements IndexCollection{
     }
 
     @Override
-    public boolean addOrReplace(JSONObject jsonObject) {
-        if(jsonObject == null || jsonObject.opt(indexKey) == null) return false;
-        JSONItem foundItem = get(jsonObject);
-        if(foundItem == null) {
-            return add(jsonObject);
+    public boolean addOrReplace(CSONObject jsonObject) {
+        if(jsonObject == null || jsonObject.opt(indexKey) == null) {
+            return false;
         }
-        foundItem.setJsonObject(jsonObject);
+        CSONItem foundItem = get(jsonObject);
+        isChanged = true;
+        if(foundItem == null) {
+            boolean isSuccess = add(jsonObject);
+            return isSuccess;
+        }
+        foundItem.setCsonObject(jsonObject);
         return true;
     }
 
     @Override
-    public boolean addOrReplaceAll(JSONArray jsonArray) {
+    public boolean addOrReplaceAll(CSONArray jsonArray) {
         boolean isSuccess = true;
-        for(int i = 0, n = jsonArray.length(); i < n; ++i) {
-            JSONObject jsonObject = jsonArray.optJSONObject(i);
-            if(jsonObject == null || jsonObject.opt(indexKey) == null) return false;
+        for(int i = 0, n = jsonArray.size(); i < n; ++i) {
+            CSONObject jsonObject = jsonArray.optObject(i);
+            if(jsonObject == null || jsonObject.opt(indexKey) == null) {
+                return false;
+            }
         }
-        for(int i = 0, n = jsonArray.length(); i < n; ++i) {
-            JSONObject jsonObject = jsonArray.getJSONObject(i);
+        isChanged = true;
+        for(int i = 0, n = jsonArray.size(); i < n; ++i) {
+            CSONObject jsonObject = jsonArray.getObject(i);
             isSuccess = isSuccess & addOrReplace(jsonObject);
         }
         return isSuccess;
     }
 
     @Override
-    public boolean add(JSONObject jsonObject) {
-        JSONItem item = new JSONItem(jsonObject, indexKey, indexSort);
+    public boolean add(CSONObject jsonObject) {
+        CSONItem item = new CSONItem(storeDelegator,jsonObject, indexKey, indexSort);
+        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        lock.lock();
         boolean success = itemSet.add(item);
-        if(fileCacheDelegator == null && itemSet.size() > memCacheLimit) {
+        if(this.dataIO == null && itemSet.size() > memCacheLimit) {
             itemSet.pollLast();
         }
+        lock.unlock();
+        isChanged = true;
         return success;
     }
 
     @Override
-    public boolean addAll(JSONArray jsonArray) {
-        ArrayList<JSONObject> jsonObjects = new ArrayList<>();
-        for(int i = 0, n = jsonArray.length(); i < n; ++i) {
-            JSONObject jsonObject = jsonArray.optJSONObject(i);
-            if(jsonObject == null) return false;
+    public boolean addAll(CSONArray csonArray) {
+        ArrayList<CSONObject> jsonObjects = new ArrayList<>();
+        for(int i = 0, n = csonArray.size(); i < n; ++i) {
+            CSONObject jsonObject = csonArray.optObject(i);
+            if(jsonObject == null) {
+                return false;
+            }
             jsonObjects.add(jsonObject);
         }
-        return addAll(jsonObjects);
-
+        boolean isSuccess = addAll(jsonObjects);
+        isChanged = true;
+        return isSuccess;
     }
 
     @Override
-    public List<JSONObject> findByIndex(Object indexValue, FindOption option, int limit) {
+    public List<CSONObject> findByIndex(Object indexValue, FindOption option, int limit) {
+        ReentrantReadWriteLock.ReadLock lock = readWriteLock.readLock();
         OP op = option.getOp();
         if(op == null) op = OP.eq;
-        ArrayList<JSONObject> result = new ArrayList<>();
-        if(limit < 1) return result;
+        ArrayList<CSONObject> result = new ArrayList<>();
+        if(limit < 1) {
+
+            return result;
+        }
         switch (op) {
             case eq:
-                JSONObject jsonObject = findByIndex(indexValue);
+                CSONObject jsonObject = findByIndex(indexValue);
                 if(jsonObject != null) result.add(jsonObject);
                 break;
             case gte:
             case gt:
                 if(indexSort > 0) {
-                    result = (ArrayList<JSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
+                    lock.lock();
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
+                    lock.unlock();
                 } else {
-                    result = (ArrayList<JSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
+                    lock.lock();
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
+                    lock.unlock();
                 }
                 break;
             case lte:
             case lt:
                 if(indexSort > 0) {
-                    result = (ArrayList<JSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    lock.lock();
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    lock.unlock();
                 } else {
-                    result = (ArrayList<JSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    lock.lock();
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    lock.unlock();
                 }
                 break;
         }
@@ -159,6 +333,7 @@ public class IndexTree implements IndexCollection{
 
     @Override
     public List<Object> removeByIndex(Object indexValue, FindOption option) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
         OP op = option.getOp();
         if(op == null) op = OP.eq;
         ArrayList<Object> results = new ArrayList<>();
@@ -171,17 +346,25 @@ public class IndexTree implements IndexCollection{
             case gte:
             case gt:
                 if(indexSort > 0) {
+                    writeLock.lock();
                     results = removeByJSONItems(itemSet.tailSet(makeIndexItem(indexValue), op == OP.gte));
+                    writeLock.unlock();
                 } else {
+                    writeLock.lock();
                     results = removeByJSONItems(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte));
+                    writeLock.unlock();
                 }
                 break;
             case lte:
             case lt:
                 if(indexSort > 0) {
+                    writeLock.lock();
                     results = removeByJSONItems(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte));
+                    writeLock.unlock();
                 } else {
+                    writeLock.lock();
                     results = removeByJSONItems(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte));
+                    writeLock.unlock();
                 }
                 break;
         }
@@ -189,44 +372,53 @@ public class IndexTree implements IndexCollection{
     }
 
     @Override
-    public List<JSONObject> list(int limit, boolean reverse) {
-        if(reverse) {
-            return (List<JSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet(), limit);
+    public List<CSONObject> list(int limit, boolean reverse) {
+        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
+        try {
+            readLock.lock();
+            if (reverse) {
+                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet(), limit);
+                return result;
+            }
+            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet, limit);
+            return result;
+        } finally {
+            readLock.unlock();
         }
-        return (List<JSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet, limit);
+
     }
 
-    private Collection<JSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<JSONItem> jsonItems, int limit) {
+    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<CSONItem> CSONItems, int limit) {
         int count = 0;
-        ArrayList<JSONObject> jsonObjects = new ArrayList<>();
-        for(JSONItem item : jsonItems) {
+        ArrayList<CSONObject> jsonObjects = new ArrayList<>();
+        for(CSONItem item : CSONItems) {
             if(count >= limit) {
                 break;
             }
-            jsonObjects.add(item.getJsonObject());
+            jsonObjects.add(item.getCsonObject());
             ++count;
         }
         return jsonObjects;
     }
 
 
-    private ArrayList<Object> removeByJSONItems(Collection<JSONItem> jsonItems) {
+    private ArrayList<Object> removeByJSONItems(Collection<CSONItem> CSONItems) {
         ArrayList<Object> removedIndexList = new ArrayList<>();
-        for(JSONItem item : jsonItems) {
+        for(CSONItem item : CSONItems) {
             removedIndexList.add(item.getIndexValue());
+            addPosInRemoveList(item);
         }
-
-        jsonItems.clear();
+        CSONItems.clear();
         return removedIndexList;
     }
 
 
     /* 아직은 구현하지 않음.
     @Override
-    public List<JSONObject> find(FindFilter findFilter, int limit) {
+    public List<CSONObject> find(FindFilter findFilter, int limit) {
         List<FindFilter> filters = findFilter.getSubFilters();
         OP rootOP = null;
-        Collection<JSONObject>[] results;
+        Collection<CSONObject>[] results;
         if(filters == null && findFilter.getKey() != null) {
             results = new Collection[1];
             results[0] = new ArrayList<>();
@@ -260,65 +452,85 @@ public class IndexTree implements IndexCollection{
     */
 
 
-    public boolean replace(JSONObject jsonObject) {
-        JSONItem currentItem = get(jsonObject);
-        if(currentItem == null) {
-            return false;
-        }
-        currentItem.setJsonObject(jsonObject);
-        return true;
-    }
 
 
 
-    private JSONItem makeIndexItem(Object index) {
-        JSONObject indexJson = new JSONObject().put(indexKey, index);
-        JSONItem indexItem = new JSONItem(indexJson, indexKey, indexSort);
+    private CSONItem makeIndexItem(Object index) {
+        CSONObject indexJson = new CSONObject().put(indexKey, index);
+        CSONItem indexItem = new CSONItem(storeDelegator,indexJson, indexKey, indexSort);
         return indexItem;
     }
 
-    private JSONObject findByIndex(Object indexValue) {
-        JSONItem foundItem = get(new JSONObject().put(indexKey, indexValue));
-        return foundItem == null ? null : foundItem.getJsonObject();
+    private CSONObject findByIndex(Object indexValue) {
+        CSONItem foundItem = get(new CSONObject().put(indexKey, indexValue));
+        return foundItem == null ? null : foundItem.getCsonObject();
     }
 
-    public boolean removeIndex(Object indexValue) {
-        JSONItem indexItem = makeIndexItem(indexValue);
-        return itemSet.remove(indexItem);
+    private boolean removeIndex(Object indexValue) {
+        CSONItem indexItem = getByIndexValue(indexValue); //makeIndexItem(indexValue);
+        if(indexItem == null) return false;
+        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        lock.lock();
+        boolean isSuccess = itemSet.remove(indexItem);
+        addPosInRemoveList(indexItem);
+        lock.unlock();;
+        return isSuccess;
     }
 
-    public JSONObject last() {
-        if(itemSet.isEmpty()) return null;
-        return itemSet.last().getJsonObject();
+    public CSONObject last() {
+        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
+        try {
+            readLock.lock();
+            if (itemSet.isEmpty()) return null;
+            return itemSet.last().getCsonObject();
+        } finally {
+            readLock.unlock();
+        }
     }
 
     @Override
-    public boolean remove(JSONObject o) {
-        JSONItem item = new JSONItem((JSONObject) o, indexKey, indexSort);
-        return itemSet.remove(item);
+    public boolean remove(CSONObject o) {
+        CSONItem item = get(o); //new CSONItem(storeDelegator,(CSONObject) o, indexKey, indexSort);
+        if(item == null) return false;
+        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        lock.lock();
+        boolean isSuccess = itemSet.remove(item);
+        addPosInRemoveList(item);
+        lock.unlock();
+        return isSuccess;
+    }
+
+    private void addPosInRemoveList(CSONItem item) {
+        long pos = item.getStorePos();
+        if(pos > 0) {
+            removeQueue.add(pos);
+        }
     }
 
 
-    public boolean addAll(Collection<? extends JSONObject> c) {
+    private boolean addAll(Collection<? extends CSONObject> c) {
         Collection<?> list = objectCollectionToJSONItemCollection(c);
-        boolean success = itemSet.addAll((Collection<? extends JSONItem>) list);
-        if(success && fileCacheDelegator == null) {
+        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
+        lock.lock();
+        boolean success = itemSet.addAll((Collection<? extends CSONItem>) list);
+        if(success && this.dataIO == null) {
             while(itemSet.size() > memCacheLimit) {
                 itemSet.pollLast();
             }
         }
+        lock.unlock();
         return success;
 
     }
 
 
     private Collection<?> objectCollectionToJSONItemCollection(Collection<?> c) {
-        ArrayList<JSONItem> list = new ArrayList<>();
+        ArrayList<CSONItem> list = new ArrayList<>();
         for(Object obj : c) {
-            if(obj instanceof JSONObject) {
-                list.add(new JSONItem((JSONObject) obj, indexKey, indexSort));
+            if(obj instanceof CSONObject) {
+                list.add(new CSONItem(storeDelegator,(CSONObject) obj, indexKey, indexSort));
             } else {
-                list.add(new JSONItem(new JSONObject().put(indexKey, obj), indexKey, indexSort));
+                list.add(new CSONItem(storeDelegator,new CSONObject().put(indexKey, obj), indexKey, indexSort));
             }
         }
         return list;
@@ -326,28 +538,63 @@ public class IndexTree implements IndexCollection{
 
 
     public void clear() {
+        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+        lock.lock();
+        for(CSONItem item : itemSet) {
+            addPosInRemoveList(item);
+        }
         itemSet.clear();
+        lock.unlock();
     }
 
     @Override
-    public Iterator<JSONObject> iterator() {
-        final Iterator<JSONItem> iterator = itemSet.iterator();
+    public Iterator<CSONObject> iterator() {
+        ReentrantReadWriteLock.ReadLock lock = readWriteLock.readLock();
+        lock.lock();
+        final Iterator<CSONItem> iterator = itemSet.iterator();
+        lock.unlock();
 
-        return new Iterator<JSONObject>() {
-
+        return new Iterator<CSONObject>() {
+            CSONItem current;
             @Override
             public boolean hasNext() {
-                return iterator.hasNext();
+                ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
+                lock.lock();
+                try {
+                    boolean hasNext = iterator.hasNext();
+                    return hasNext;
+                } finally {
+                    lock.unlock();
+                }
             }
 
             @Override
-            public JSONObject next() {
-                return iterator.next().getJsonObject();
+            public CSONObject next() {
+                ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
+                lock.lock();
+                try {
+                    current = iterator.next();
+                    if(current == null) return null;
+                    return current.getCsonObject();
+                } finally {
+                    lock.unlock();
+                }
+
             }
 
             @Override
             public void remove() {
-                iterator.remove();;
+                ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
+                lock.lock();
+                try {
+                    iterator.remove();
+                    if(current != null) {
+                        addPosInRemoveList(current);
+                    }
+                } finally {
+                    lock.unlock();
+                }
+
             }
         };
     }

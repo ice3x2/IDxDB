@@ -1,48 +1,159 @@
 package com.snoworca.IdxDB;
 
-import com.snoworca.IdxDB.collection.FileCacheDelegator;
-import com.snoworca.IdxDB.collection.IndexCollection;
-import com.snoworca.IdxDB.collection.IndexTree;
+import com.snoworca.IdxDB.collection.*;
 
+import com.snoworca.IdxDB.dataStore.DataBlock;
 import com.snoworca.IdxDB.dataStore.DataIO;
-import org.json.JSONObject;
+import com.snoworca.IdxDB.dataStore.DataIOConfig;
+import com.snoworca.cson.CSONObject;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class IdxDB {
 
     private DataIO dataIO;
+    private long topStoreInfoStorePos = 0;
+    private long createTime = 0;
 
-    private ConcurrentHashMap<String, IndexTree> setMap = new ConcurrentHashMap<>();
+    private final static String META_INFO_TYPE_ENTRY = "entry";
 
-    public static IdxDB create(File file) {
-        IdxDB idxDB = new IdxDB();
-        idxDB.dataIO = new DataIO(file);
-        return idxDB;
+    private ConcurrentHashMap<String, IndexCollection> indexCollectionMap = new ConcurrentHashMap<>();
+    private ReentrantLock collectionMutableLock = new ReentrantLock();
+
+
+    public static IdxDBMaker newMaker(File file) {
+        return new IdxDBMaker(file);
     }
+
+    public static class  IdxDBMaker {
+        private File dbFile;
+        private int dataReaderCapacity = 3;
+        private final static long version = 1;
+
+        public IdxDBMaker(File file) {
+            this.dbFile = file;
+        }
+
+        public IdxDBMaker dataReaderCapacity(int capacity) {
+            if(capacity < 1) capacity = 1;
+            dataReaderCapacity = capacity;
+            return this;
+        }
+
+
+        public IdxDB make() throws IOException {
+            IdxDB idxDB = new IdxDB();
+            DataIOConfig dataIOConfig = new DataIOConfig();
+            dataIOConfig.setReaderCapacity(dataReaderCapacity);
+            boolean existDBFile = dbFile.isFile() && dbFile.length() > 0;
+            idxDB.dataIO = new DataIO(dbFile, dataIOConfig);
+            idxDB.dataIO.open();
+            if(existDBFile) {
+                loadDB(idxDB);
+            } else {
+                initDB(idxDB);
+            }
+            return idxDB;
+        }
+
+        private void loadDB(IdxDB db) throws IOException {
+            DataBlock dataBlock = db.dataIO.get(0);
+            CSONObject csonObject = new CSONObject(dataBlock.getData());
+            db.createTime = csonObject.getLong("create");
+            //TODO type 확인하고 일치하지 않을경우 exception
+            long nextPos = dataBlock.getHeader().getNext();
+            loadCollections(db, nextPos);
+        }
+
+        private void loadCollections(IdxDB db, long collectionInfoPos) {
+            if(collectionInfoPos < 0) return;
+            Iterator<DataBlock> dataBlockIterator = db.dataIO.iterator(collectionInfoPos);
+            while(dataBlockIterator.hasNext()) {
+                DataBlock dataBlock = dataBlockIterator.next();
+                byte[] buffer = dataBlock.getData();
+                CSONObject csonObject = new CSONObject(buffer);
+                if(IndexTree.class.getName().equals(csonObject.getString("className"))) {
+                    IndexTree indexTree = new IndexTree(db.dataIO, IndexTreeOption.fromCSONObject(csonObject));
+                    db.indexCollectionMap.put(indexTree.getName(), indexTree);
+                }
+            }
+
+        }
+
+
+
+        private void initDB(IdxDB db) throws IOException {
+            CSONObject dbInfo = new CSONObject().put("type", META_INFO_TYPE_ENTRY).put("name", "idxDB").put("version", version).put("create", System.currentTimeMillis());
+            DataBlock dataBlock = db.dataIO.write(dbInfo.toByteArray());
+            db.topStoreInfoStorePos = dataBlock.getPos();
+        }
+
+
+    }
+
+
+    private IdxDB() {
+
+    }
+
+
+    public boolean isClosed() {
+        return dataIO == null;
+    }
+
+
+    public void close() {
+        dataIO.close();
+        dataIO = null;
+    }
+
+
+
 
     public IndexTreeBuilder newIndexTreeBuilder(String name) {
-        return new IndexTreeBuilder(name);
+        CollectionCreateCallback callback = new CollectionCreateCallback() {
+            @Override
+            public void onCreate(IndexCollection indexCollection) {
+                String name = ((IndexTree)indexCollection).getName();
+                indexCollectionMap.put(name, (IndexCollection)indexCollection);
+                long headPos = ((IndexTree)indexCollection).getHeadPos();
+                CSONObject optionInfo = ((IndexTree)indexCollection).getOptionInfo();
+                optionInfo.put("headPos", headPos);
+                byte[] buffer = optionInfo.toByteArray();
+                try {
+                    DataBlock dataBlock = dataIO.write(buffer);
+                    long pos = dataBlock.getPos();
+                    long lastPos = topStoreInfoStorePos;
+                    dataIO.setNextPos(lastPos, pos);
+                    dataIO.setPrevPos(pos, lastPos);
+                    dataIO.setPrevPos(0, -1);
+                    topStoreInfoStorePos = pos;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+
+        return new IndexTreeBuilder(callback, dataIO,name, collectionMutableLock);
     }
 
-    public JSONObject executeQuery(JSONObject query) {
+
+
+    public CSONObject executeQuery(CSONObject query) {
         return QueryExecutor.execute(this,query);
     }
 
-    public IndexTree getSet(String name) {
-        return setMap.get(name);
-    }
+
 
     public IndexCollection get(String name) {
-        return setMap.get(name);
+        return indexCollectionMap.get(name);
     }
 
-    private FileCacheDelegator fileCacheDelegator = new FileCacheDelegator() {
+    private StoreDelegator storeDelegator = new StoreDelegator() {
         @Override
         public long cache(byte[] buffer) {
             try {
@@ -63,61 +174,6 @@ public class IdxDB {
         }
     };
 
-    public class IndexTreeBuilder {
 
-        private String name;
-
-        private String indexKey = "";
-        private int sort = 0;
-        private int memCacheSize = Integer.MAX_VALUE;
-
-        private boolean fileStoreMode = false;
-
-        private Map<String, Object> toOptionMap() {
-
-
-            return null;
-
-        }
-
-
-        IndexTreeBuilder(String name) {
-            this.name = name;
-        }
-
-        public IndexTreeBuilder setFileStore(boolean enable) {
-            this.fileStoreMode = enable;
-            return this;
-        }
-
-
-        public IndexTreeBuilder index(String key, int sort) {
-            this.indexKey = key;
-            this.sort = sort;
-            return this;
-        }
-
-
-        public IndexTreeBuilder memCacheSize(int limit) {
-            this.memCacheSize = limit;
-            return this;
-        }
-
-        public IndexTree create() {
-            try {
-                Constructor<IndexTree> constructor = IndexTree.class.getDeclaredConstructor(FileCacheDelegator.class, Integer.class, String.class, Integer.class);
-                constructor.setAccessible(true);
-                IndexTree set = constructor.newInstance( (fileStoreMode ? fileCacheDelegator : null), memCacheSize, indexKey, sort);
-                constructor.setAccessible(false);
-                setMap.put(this.name, set);
-                return  set;
-            } catch (NoSuchMethodException | InvocationTargetException | InstantiationException |
-                     IllegalAccessException e) {
-                throw new RuntimeException(e);
-            }
-
-        }
-
-    }
 
 }

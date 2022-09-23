@@ -2,8 +2,9 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.snoworca.IdxDB.collection.IndexTreeBuilder;
+import com.snoworca.cson.CSONArray;
+import com.snoworca.cson.CSONObject;
 
 import java.util.List;
 
@@ -11,14 +12,14 @@ public class QueryExecutor {
 
 
 
-    protected static JSONObject execute(IdxDB store, JSONObject jsonQuery) {
+    protected static CSONObject execute(IdxDB store, CSONObject jsonQuery) {
         String method = jsonQuery.optString("method");
         if(method == null) {
-            return makeErrorJSONObject("No 'method' in the query.");
+            return makeErrorCSONObject("No 'method' in the query.");
         }
-        JSONObject argument = jsonQuery.optJSONObject("argument");
+        CSONObject argument = jsonQuery.optObject("argument");
         if(argument == null || argument.isEmpty()) {
-            return makeErrorJSONObject("No object of 'argument' in query method '" + method + "'.");
+            return makeErrorCSONObject("No object of 'argument' in query method '" + method + "'.");
         }
         if("createSet".equalsIgnoreCase(method)) {
             return executeCreateSetMethod(store, argument);
@@ -42,146 +43,148 @@ public class QueryExecutor {
     }
 
 
-    public static  JSONObject executeCreateSetMethod(IdxDB store, JSONObject argument) {
+    public static  CSONObject executeCreateSetMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
-        int limit = argument.optInt("limit", Short.MAX_VALUE * 2);
-        JSONObject index = argument.optJSONObject("index");
+        int limit = argument.optInteger("limit", Short.MAX_VALUE * 2);
+        CSONObject index = argument.optObject("index");
         if(name == null || name.isEmpty()) {
-            return makeErrorJSONObject("'name' is missing from the query argument.");
+            return makeErrorCSONObject("'name' is missing from the query argument.");
         }
         if(index == null || index.isEmpty()) {
-            return makeErrorJSONObject("'index' is missing from the query argument.");
+            return makeErrorCSONObject("'index' is missing from the query argument.");
         }
-        if(store.getSet(name) != null) {
-            return makeErrorJSONObject("A set with the name '" + name + "' already exists.");
+        if(store.get(name) != null) {
+            return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
         }
-        IdxDB.IndexTreeBuilder indexTreeBuilder = store.newIndexTreeBuilder(name).memCacheSize(limit);
-        String firstIndexKey = index.keys().next();
-        int sortMethod = index.optInt(firstIndexKey, 1);
+        IndexTreeBuilder indexTreeBuilder = store.newIndexTreeBuilder(name).memCacheSize(limit);
+        String firstIndexKey = index.keySet().iterator().next();
+        int sortMethod = index.optInteger(firstIndexKey, 1);
         indexTreeBuilder.index(firstIndexKey, sortMethod);
         indexTreeBuilder.create();
-        return new JSONObject().put("isError", false).put("success", true).put("message", "ok");
+        return new CSONObject().put("isError", false).put("success", true).put("message", "ok");
     }
 
 
-    public static  JSONObject executeListMethod(IdxDB store, JSONObject argument) {
+    public static  CSONObject executeListMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
-        int limit = argument.optInt("limit", Integer.MAX_VALUE);
+        int limit = argument.optInteger("limit", Integer.MAX_VALUE);
         boolean revers = argument.optBoolean("revers", false);
 
         IndexCollection indexCollection = null;
         if(name == null || name.isEmpty()) {
-            return makeErrorJSONObject("'name' is missing from the query argument.");
+            return makeErrorCSONObject("'name' is missing from the query argument.");
         }
         if( (indexCollection = store.get(name)) == null) {
-            return makeErrorJSONObject("Collection '" + name + "' not found.");
+            return makeErrorCSONObject("Collection '" + name + "' not found.");
         }
+        List<CSONObject> jsonObjects = indexCollection.list(limit, revers);
 
-        List<JSONObject> jsonObjects = indexCollection.list(limit, revers);
-        return new JSONObject().put("isError", false).put("success", true).put("message", "ok").put("data",new JSONArray(jsonObjects));
+        return new CSONObject().put("isError", false).put("success", true).put("message", "ok").put("data",new CSONArray(jsonObjects));
     }
 
 
-    public static  JSONObject executeAddMethod(IdxDB store, JSONObject argument) {
+    public static  CSONObject executeAddMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
         Object data = argument.opt("data");
         IndexCollection indexCollection = null;
         if(name == null || name.isEmpty()) {
-            return makeErrorJSONObject("'name' is missing from the query argument.");
+            return makeErrorCSONObject("'name' is missing from the query argument.");
         }
         if( (indexCollection = store.get(name)) == null) {
-            return makeErrorJSONObject("Collection '" + name + "' not found.");
+            return makeErrorCSONObject("Collection '" + name + "' not found.");
         }
         if(data == null) {
-            return makeErrorJSONObject("'data' is missing from the query argument.");
+            return makeErrorCSONObject("'data' is missing from the query argument.");
         }
         boolean isSuccess = false;
-        if(data instanceof JSONObject) {
-            if(((JSONObject)data).isEmpty()) {
-                return makeErrorJSONObject("'data' is empty.");
+        if(data instanceof CSONObject) {
+            if(((CSONObject)data).isEmpty()) {
+                return makeErrorCSONObject("'data' is empty.");
             }
-            isSuccess = indexCollection.add((JSONObject)data);
+            isSuccess = indexCollection.add((CSONObject)data);
         }
-        else if(data instanceof JSONArray) {
-            if(((JSONArray)data).isEmpty()) {
-                return makeErrorJSONObject("'data' is empty.");
+        else if(data instanceof CSONArray) {
+            if(((CSONArray)data).isEmpty()) {
+                return makeErrorCSONObject("'data' is empty.");
             }
-            isSuccess = indexCollection.addAll((JSONArray)data);
+            isSuccess = indexCollection.addAll((CSONArray) data);
         }
-        return new JSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail");
+        indexCollection.commit();
+        return new CSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail");
     }
 
-    public static  JSONObject executeSizeMethod(IdxDB store, JSONObject argument) {
+    public static  CSONObject executeSizeMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
         IndexCollection indexCollection = null;
         if(name == null || name.isEmpty()) {
-            return makeErrorJSONObject("'name' is missing from the query argument.");
+            return makeErrorCSONObject("'name' is missing from the query argument.");
         }
         if( (indexCollection = store.get(name)) == null) {
-            return makeErrorJSONObject("Collection '" + name + "' not found.");
+            return makeErrorCSONObject("Collection '" + name + "' not found.");
         }
         int size = indexCollection.size();
-        return new JSONObject().put("isError", false).put("success", true).put("message", "ok").put("data", size);
+        return new CSONObject().put("isError", false).put("success", true).put("message", "ok").put("data", size);
     }
 
-    public static  JSONObject executeAddOrReplaceMethod(IdxDB store, JSONObject argument) {
+    public static  CSONObject executeAddOrReplaceMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
         Object data = argument.opt("data");
         IndexCollection indexCollection = null;
         if(name == null || name.isEmpty()) {
-            return makeErrorJSONObject("'name' is missing from the query argument.");
+            return makeErrorCSONObject("'name' is missing from the query argument.");
         }
         if( (indexCollection = store.get(name)) == null) {
-            return makeErrorJSONObject("Collection '" + name + "' not found.");
+            return makeErrorCSONObject("Collection '" + name + "' not found.");
         }
         if(data == null) {
-            return makeErrorJSONObject("'data' is missing from the query argument.");
+            return makeErrorCSONObject("'data' is missing from the query argument.");
         }
         boolean isSuccess = false;
-        if(data instanceof JSONObject) {
-            if(((JSONObject)data).isEmpty()) {
-                return makeErrorJSONObject("'data' is empty.");
+        if(data instanceof CSONObject) {
+            if(((CSONObject)data).isEmpty()) {
+                return makeErrorCSONObject("'data' is empty.");
             }
-            isSuccess = indexCollection.addOrReplace((JSONObject)data);
+            isSuccess = indexCollection.addOrReplace((CSONObject)data);
         }
-        else if(data instanceof JSONArray) {
-            if(((JSONArray)data).isEmpty()) {
-                return makeErrorJSONObject("'data' is empty.");
+        else if(data instanceof CSONArray) {
+            if(((CSONArray)data).isEmpty()) {
+                return makeErrorCSONObject("'data' is empty.");
             }
-            isSuccess = indexCollection.addOrReplaceAll((JSONArray)data);
+            isSuccess = indexCollection.addOrReplaceAll((CSONArray) data);
         }
-        return new JSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail");
+        indexCollection.commit();
+        return new CSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail");
     }
 
 
 
 
 
-    private static JSONObject toSingleJSONObject(Object obj) {
-        if(obj instanceof JSONObject) {
-            if(((JSONObject)obj).isEmpty()) return null;
-            return (JSONObject)obj;
+    private static CSONObject toSingleCSONObject(Object obj) {
+        if(obj instanceof CSONObject) {
+            if(((CSONObject)obj).isEmpty()) return null;
+            return (CSONObject)obj;
         }
-        if(obj instanceof JSONArray) {
-            if(((JSONArray)obj).isEmpty()) return null;
-            return ((JSONArray)obj).optJSONObject(0);
+        if(obj instanceof CSONArray) {
+            if(((CSONArray)obj).isEmpty()) return null;
+            return ((CSONArray)obj).optObject(0);
         }
         return null;
     }
 
 
-    public static  JSONObject executeByIndexMethod(IdxDB store, JSONObject argument, String method) {
+    public static  CSONObject executeByIndexMethod(IdxDB store, CSONObject argument, String method) {
         String name = argument.optString("name");
-        JSONObject where = toSingleJSONObject(argument.opt("where"));
+        CSONObject where = toSingleCSONObject(argument.opt("where"));
         IndexCollection indexCollection = null;
         if(name == null || name.isEmpty()) {
-            return makeErrorJSONObject("'name' is missing from the query argument.");
+            return makeErrorCSONObject("'name' is missing from the query argument.");
         }
         if((indexCollection = store.get(name)) == null) {
-            return makeErrorJSONObject("Collection '" + name + "' not found.");
+            return makeErrorCSONObject("Collection '" + name + "' not found.");
         }
         if(where == null || where.isEmpty()) {
-            return makeErrorJSONObject("'where' is missing from the query argument.");
+            return makeErrorCSONObject("'where' is missing from the query argument.");
         }
         String key = null;
         for(String keyItem : where.keySet()) {
@@ -191,34 +194,35 @@ public class QueryExecutor {
             }
         }
         if(key == null) {
-            return makeErrorJSONObject("The index key does not exist in the 'where' object.");
+            return makeErrorCSONObject("The index key does not exist in the 'where' object.");
         }
         if(!indexCollection.indexKeys().contains(key)) {
-            return makeErrorJSONObject("The key '" + key + "' is not an index .");
+            return makeErrorCSONObject("The key '" + key + "' is not an index .");
         }
         Object indexValue = where.opt(key);
         String op = where.optString("$op", "eq");
-        int limit = argument.optInt("limit", Integer.MAX_VALUE);
+        int limit = argument.optInteger("limit", Integer.MAX_VALUE);
         FindOption findOption = new FindOption();
         findOption.setOp(OP.fromString(op));
 
-        JSONArray data;
+        CSONArray data;
         if("findByIndex".equalsIgnoreCase(method)) {
-            List<JSONObject> list = indexCollection.findByIndex(indexValue,findOption,limit);
-            data = new JSONArray(list);
+            List<CSONObject> list = indexCollection.findByIndex(indexValue,findOption,limit);
+            data = new CSONArray(list);
         } else {
             List<Object> list = indexCollection.removeByIndex(indexValue,findOption);
-            data = new JSONArray(list);
+            data = new CSONArray(list);
+            indexCollection.commit();
         }
 
-        return new JSONObject().put("isError", false).put("success", !data.isEmpty()).put("message","ok").put("data", data);
+        return new CSONObject().put("isError", false).put("success", !data.isEmpty()).put("message","ok").put("data", data);
     }
 
 
 
 
-    public static JSONObject makeErrorJSONObject(String message) {
-        return new JSONObject().put("isError", true).put("success", false).put("message", message);
+    public static CSONObject makeErrorCSONObject(String message) {
+        return new CSONObject().put("isError", true).put("success", false).put("message", message);
     }
 
 

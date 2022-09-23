@@ -29,6 +29,27 @@ class DataIOTest {
     }
 
 
+    @Test
+    void zeroPosBugTest() throws IOException {
+        File file = new File("./testdata112.dat");
+        file.delete();
+        DataIO dataIO = new DataIO(file);
+        dataIO.open();
+        long posZero = dataIO.write(makeRandomString()).getPos();
+        long posOne = dataIO.write(makeRandomString()).getPos();
+        dataIO.setNextPos(posZero, posOne);
+        dataIO.setPrevPos(posOne, posZero);
+        dataIO.close();
+
+        dataIO = new DataIO(file);
+        dataIO.open();
+
+        DataBlock dataBlock = dataIO.get(0);
+        assertEquals(dataBlock.getHeader().getNext(), posOne);
+
+
+    }
+
 
     @Test
     void writeAndRandomGet() throws IOException {

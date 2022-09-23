@@ -37,7 +37,12 @@ public class DataReader {
 
 
     public DataBlock read() throws IOException {
-        return read(false);
+        try {
+            return read(false);
+        } catch (Exception e) {
+            reopen();
+            return read(true);
+        }
     }
 
     private DataBlock read(boolean retry) throws IOException {

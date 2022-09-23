@@ -7,7 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class DataBlockHeader {
-    private final static AtomicLong TOP_ID = new AtomicLong(Long.MIN_VALUE);
+    private final static AtomicLong TOP_ID = new AtomicLong(0);
 
     // prefix(1), id(8), type(1), len(4), prev(8), next(8)
     final static int HEADER_SIZE = 1 + 8 + 1 +4 + 8 + 8;
@@ -23,11 +23,11 @@ public class DataBlockHeader {
 
     public final static byte PREFIX = 0x64; /** D */
 
-    private long ID;
+    private long ID = 0L;
     private long prev = -1;
     private long next = -1;
 
-    private int length;
+    private int length = 0;
 
 
 
@@ -129,7 +129,7 @@ public class DataBlockHeader {
 
         int prefix = headerBuffer.get();
         if(prefix != PREFIX) {
-            throw  new DataBlockParseException("Data block header parsing error: Invalid prefix value. (" + prefix + ")");
+            throw  new DataBlockParseException("Data block header parsing error: Invalid prefix value. (" + DataBlockHeader.PREFIX + " != " + prefix + ")");
         }
         DataBlockHeader dataHeader = new DataBlockHeader();
         dataHeader.ID =  headerBuffer.getLong();

@@ -1,14 +1,17 @@
 package com.snoworca.IdxDB;
 
+import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexTree;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.snoworca.cson.CSONArray;
+import com.snoworca.cson.CSONObject;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,58 +19,144 @@ class IdxDBTest {
 
 
     @Test
-    public void memCacheTest() {
+    public void memCacheTest() throws IOException {
         File file = new File("test.db");
-        IdxDB idxDB = IdxDB.create(file);
+        file.delete();
+        IdxDB idxDB = IdxDB.newMaker(file).make();
         IndexTree set = idxDB.newIndexTreeBuilder("208300").index("dateL", 1).memCacheSize(1000).create();
 
-        ArrayList<JSONObject> testDatas = new ArrayList<>();
+        ArrayList<CSONObject> testDatas = new ArrayList<>();
         for(int i = 0; i < 2000; ++i) {
-            JSONObject jsonObject = new JSONObject().put("CODE", i % 100).put("dateL", i);
+            CSONObject jsonObject = new CSONObject().put("CODE", i % 100).put("dateL", i);
             testDatas.add(jsonObject);
         }
         Collections.shuffle(testDatas);
         for(int i = 0; i < 2000; ++i) {
             set.add(testDatas.get(i));
         }
-        assertTrue(set.size() == 1000);
+        set.commit();
 
 
         int lastValue = -1;
-        for(JSONObject jsonObject : set) {
-            assertTrue(Math.abs(jsonObject.getInt("dateL") - lastValue) == 1);
-            lastValue = jsonObject.getInt("dateL");
+        for(CSONObject jsonObject : set) {
+            assertTrue(Math.abs(jsonObject.getInteger("dateL") - lastValue) == 1);
+            lastValue = jsonObject.getInteger("dateL");
            // System.out.println(lastValue);
         }
 
-        Iterator<JSONObject> iterator =  set.iterator();
+        Iterator<CSONObject> iterator =  set.iterator();
         iterator.next();
         iterator.remove();
-        JSONObject jsonObject = iterator.next();
+        CSONObject jsonObject = iterator.next();
         assertEquals(1, jsonObject.get("dateL"));
-        assertEquals(999, set.size());
+        assertEquals(1999, set.size());
 
 
-        set.add(new JSONObject().put("CODE",0).put("dateL", 0));
-        set.add(new JSONObject().put("CODE",220).put("dateL", 0));
-        set.add(new JSONObject().put("CODE",4000).put("dateL", 4000));
-        JSONObject testObj = set.last();
-        assertEquals(999,testObj.get("dateL"));
+        set.add(new CSONObject().put("CODE",0).put("dateL", 0));
+        set.add(new CSONObject().put("CODE",220).put("dateL", 0));
+        set.add(new CSONObject().put("CODE",4000).put("dateL", 4000));
+        CSONObject testObj = set.last();
+        assertEquals(4000,testObj.get("dateL"));
 
-        //set.replace(new JSONObject().put("CODE","1234555").put("dateL", 555));
+        //set.replace(new CSONObject().put("CODE","1234555").put("dateL", 555));
         //assertEquals("1234555", set.findByIndex(555).get("CODE"));
         file.delete();
     }
 
 
     @Test
-    public void queryTest() {
+    public void fileStoreTest() throws IOException {
+        File file = new File("fileStoreTest.dat");
+        long start = System.currentTimeMillis();
+        IdxDB idxDB = IdxDB.newMaker(file).make();
+        int collectionSize = 20;
+        int rowSize = 6000;
+        int memCacheSize = 1000;
+        long testCase = collectionSize * rowSize;
+
+
+        for(int k = 0; k < collectionSize; ++k) {
+            IndexTree indexTree = idxDB.newIndexTreeBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
+            for(int i = 0; i < rowSize; ++i) {
+                indexTree.add(new CSONObject().put("date", i).put("str", i + ""));
+            }
+            indexTree.commit();
+            if(k % 10 == 0 && k != 0) {
+                System.out.println(k + ",");
+            } else {
+                System.out.print(k + ", ");
+            }
+
+        }
+        System.out.println(testCase + " 개 쓰기 " + (System.currentTimeMillis() - start) + "ms");
+
+        start = System.currentTimeMillis();
+        List<CSONObject> csonObjectListOriList = idxDB.get("0").list(Integer.MAX_VALUE, false);
+        for(CSONObject csonObject : csonObjectListOriList) {
+            if(csonObject.optInteger("date") % 10 == 0) {
+                idxDB.get("0").removeByIndex(csonObject.optInteger("date"), FindOption.fromOP(OP.eq));
+            }
+        }
+        idxDB.get("0").commit();
+
+        idxDB.get("2").removeByIndex(2000, FindOption.fromOP(OP.gte));
+        idxDB.get("2").commit();
+
+        idxDB.get("3").clear();
+        idxDB.get("3").commit();
+
+
+        assertEquals(rowSize, csonObjectListOriList.size());
+        System.out.println( rowSize + "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+        idxDB.close();
+
+        start = System.currentTimeMillis();
+        idxDB = IdxDB.newMaker(file).make();
+        System.out.println( testCase + " 개 로딩 " + (System.currentTimeMillis() - start) + "ms");
+
+        start = System.currentTimeMillis();
+        List<CSONObject> csonObjectList = idxDB.get("1").list(Integer.MAX_VALUE, false);
+        assertEquals(rowSize, csonObjectList.size());
+        System.out.println( rowSize + " 개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+
+        start = System.currentTimeMillis();
+        csonObjectList = idxDB.get("1").list(memCacheSize, false);
+        System.out.println("메모리에 캐쉬된 " + memCacheSize + "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+
+        start = System.currentTimeMillis();
+        csonObjectList = idxDB.get("0").list(Integer.MAX_VALUE, false);
+        assertEquals(rowSize - 600, csonObjectList.size());
+        System.out.println(csonObjectList.size() + " " + (rowSize - 600) +  "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+
+
+        start = System.currentTimeMillis();
+        csonObjectList = idxDB.get("2").list(Integer.MAX_VALUE, false);
+        assertEquals(2000, csonObjectList.size());
+        System.out.println(csonObjectList.size() +  "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+
+
+        start = System.currentTimeMillis();
+        csonObjectList = idxDB.get("3").list(Integer.MAX_VALUE, false);
+        assertEquals(0, csonObjectList.size());
+        System.out.println(csonObjectList.size() +  "개 읽기 " + (System.currentTimeMillis() - start) + "ms");
+
+
+
+
+        file.delete();
+
+
+
+    }
+
+    @Test
+    public void queryTest() throws IOException {
         File file = new File("test.db");
-        IdxDB idxDB = IdxDB.create(file);
-        JSONObject resultQuery = null;
+        IdxDB idxDB = IdxDB.newMaker(file).make();
+        CSONObject resultQuery = null;
 
         // 이름 없음 에러
-        JSONObject createSetErrorQueryNoName = new JSONObject().put("method", "createSet").put("argument",new JSONObject().put("index", new JSONObject().put("dateL", -1)).put("limit", 1000));
+        CSONObject createSetErrorQueryNoName = new CSONObject().put("method", "createSet").put("argument",new CSONObject().put("index", new CSONObject().put("dateL", -1)).put("limit", 1000));
         resultQuery = idxDB.executeQuery(createSetErrorQueryNoName);
         System.out.print("이름 없음: ");
         System.out.println(resultQuery);
@@ -75,7 +164,7 @@ class IdxDBTest {
 
 
         // 인덱스가 없음 에러.
-        JSONObject createSetErrorQueryNoIndex = new JSONObject().put("method", "createSet").put("argument",new JSONObject().put("name", "201120").put("limit", 1000).put("index", new JSONObject()));
+        CSONObject createSetErrorQueryNoIndex = new CSONObject().put("method", "createSet").put("argument",new CSONObject().put("name", "201120").put("limit", 1000).put("index", new CSONObject()));
         resultQuery = idxDB.executeQuery(createSetErrorQueryNoIndex);
         System.out.print("인덱스가 없음: ");
         System.out.println(resultQuery);
@@ -83,7 +172,7 @@ class IdxDBTest {
 
 
         // 정상 생성
-        JSONObject createSetQuery = new JSONObject().put("method", "createSet").put("argument",new JSONObject().put("name", "201120").put("index", new JSONObject().put("dateL", -1)).put("limit", 1000));
+        CSONObject createSetQuery = new CSONObject().put("method", "createSet").put("argument",new CSONObject().put("name", "201120").put("index", new CSONObject().put("dateL", -1)).put("limit", 1000));
         resultQuery = idxDB.executeQuery(createSetQuery);
         System.out.print("생성 성공: ");
         System.out.println(resultQuery);
@@ -97,7 +186,7 @@ class IdxDBTest {
         assertTrue(resultQuery.optBoolean("isError"));
 
         // collection 이름 없음 에러
-        JSONObject addQueryNoSetError = new JSONObject().put("method", "add").put("argument",new JSONObject().put("name", "sdafasdf").put("data", new JSONObject().put("dateL", 100).put("name", "삼성전자")));
+        CSONObject addQueryNoSetError = new CSONObject().put("method", "add").put("argument",new CSONObject().put("name", "sdafasdf").put("data", new CSONObject().put("dateL", 100).put("name", "삼성전자")));
         resultQuery = idxDB.executeQuery(addQueryNoSetError);
         System.out.print("콜렉션 이름 없음: ");
         System.out.println(resultQuery);
@@ -105,131 +194,131 @@ class IdxDBTest {
 
 
         // 두 번째 쿼리는 무시됨.
-        JSONObject addQuery = new JSONObject().put("method", "add").put("argument", new JSONObject().put("name","201120").put("data", new JSONObject().put("dateL", 100).put("name", "삼성전자")));
+        CSONObject addQuery = new CSONObject().put("method", "add").put("argument", new CSONObject().put("name","201120").put("data", new CSONObject().put("dateL", 100).put("name", "삼성전자")));
         resultQuery = idxDB.executeQuery(addQuery);
         assertFalse(resultQuery.optBoolean("isError"));
         assertTrue(resultQuery.optBoolean("success"));
         System.out.print("데이터 삽입: ");
         System.out.println(resultQuery);
-        addQuery = new JSONObject().put("method", "add").put("argument", new JSONObject().put("name","201120").put("data", new JSONObject().put("dateL", 100).put("name", "HLB")));
+        addQuery = new CSONObject().put("method", "add").put("argument", new CSONObject().put("name","201120").put("data", new CSONObject().put("dateL", 100).put("name", "HLB")));
         resultQuery = idxDB.executeQuery(addQuery);
         assertFalse(resultQuery.optBoolean("isError"));
         assertFalse(resultQuery.optBoolean("success"));
         System.out.print("중복 인덱스 삽입: ");
         System.out.println(resultQuery);
 
-        JSONObject findQuery = new JSONObject().put("method", "findByIndex").put("argument", new JSONObject().put("name","201120").put("where",new JSONObject().put("dateL",100).put("$op", "eq")));
+        CSONObject findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("where",new CSONObject().put("dateL",100).put("$op", "eq")));
         resultQuery = idxDB.executeQuery(findQuery);
         System.out.print("검색결과(eq): ");
         System.out.println(resultQuery);
-        assertEquals("삼성전자",resultQuery.optJSONArray("data").getJSONObject(0).optString("name"));
+        assertEquals("삼성전자",resultQuery.optArray("data").getObject(0).optString("name"));
 
 
 
 
         // add or replace
-        JSONObject addOrReplaceQuery = new JSONObject().put("method", "addOrReplace").put("argument", new JSONObject().put("name","201120").put("data", new JSONObject().put("dateL", 100).put("name", "HLB")));
+        CSONObject addOrReplaceQuery = new CSONObject().put("method", "addOrReplace").put("argument", new CSONObject().put("name","201120").put("data", new CSONObject().put("dateL", 100).put("name", "HLB")));
         resultQuery = idxDB.executeQuery(addOrReplaceQuery);
 
-        findQuery = new JSONObject().put("method", "findByIndex").put("argument", new JSONObject().put("name","201120").put("where",new JSONObject().put("dateL",100).put("$op", "eq")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("where",new CSONObject().put("dateL",100).put("$op", "eq")));
         resultQuery = idxDB.executeQuery(findQuery);
         System.out.print("addOrReplace 호출후 검색결과(eq): ");
         System.out.println(resultQuery);
-        assertEquals("HLB",resultQuery.optJSONArray("data").getJSONObject(0).optString("name"));
+        assertEquals("HLB",resultQuery.optArray("data").getObject(0).optString("name"));
 
 
 
-        ArrayList<JSONObject> testDatas = new ArrayList<>();
+        ArrayList<CSONObject> testDatas = new ArrayList<>();
         for(int i = 0; i < 200; ++i) {
-            JSONObject jsonObject = new JSONObject().put("CODE", i % 100).put("dateL", i);
+            CSONObject jsonObject = new CSONObject().put("CODE", i % 100).put("dateL", i);
             testDatas.add(jsonObject);
         }
         Collections.shuffle(testDatas);
-        JSONArray addArray = new JSONArray();
+        CSONArray addArray = new CSONArray();
         for(int i = 0; i < 200; ++i) {
-            addArray.put(testDatas.get(i));
+            addArray.add(testDatas.get(i));
         }
 
         // add or replace All
-        JSONObject addOrReplaceAllQuery = new JSONObject().put("method", "addOrReplace").put("argument", new JSONObject().put("name","201120").put("data", addArray));
+        CSONObject addOrReplaceAllQuery = new CSONObject().put("method", "addOrReplace").put("argument", new CSONObject().put("name","201120").put("data", addArray));
         resultQuery = idxDB.executeQuery(addOrReplaceAllQuery);
         assertTrue(resultQuery.optBoolean("success"));
         System.out.print("addOrReplaceAllQuery: ");
         System.out.println(resultQuery);
 
-        findQuery = new JSONObject().put("method", "findByIndex").put("argument", new JSONObject().put("name","201120").put("limit",30).put("where",new JSONObject().put("dateL",50).put("$op", "gte")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",30).put("where",new CSONObject().put("dateL",50).put("$op", "gte")));
         resultQuery = idxDB.executeQuery(findQuery);
         System.out.print("find gte(50), limit(30): ");
         System.out.println(resultQuery);
-        JSONArray resultData = resultQuery.getJSONArray("data");
-        assertEquals(30, resultData.length());
-        assertEquals(resultData.getJSONObject(0).getInt("dateL"), 50);
-        assertEquals(resultData.getJSONObject(29).getInt("dateL"), 79);
+        CSONArray resultData = resultQuery.getArray("data");
+        assertEquals(30, resultData.size());
+        assertEquals(resultData.getObject(0).getInteger("dateL"), 50);
+        assertEquals(resultData.getObject(29).getInt("dateL"), 79);
 
 
-        findQuery = new JSONObject().put("method", "findByIndex").put("argument", new JSONObject().put("name","201120").put("limit",5).put("where",new JSONObject().put("dateL",50).put("$op", "gt")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",5).put("where",new CSONObject().put("dateL",50).put("$op", "gt")));
         resultQuery = idxDB.executeQuery(findQuery);
         System.out.print("find gt(50), limit(5): ");
         System.out.println(resultQuery);
-        resultData = resultQuery.getJSONArray("data");
-        assertEquals(5, resultData.length());
-        assertEquals(resultData.getJSONObject(0).getInt("dateL"), 51);
-        assertEquals(resultData.getJSONObject(4).getInt("dateL"), 55);
+        resultData = resultQuery.getArray("data");
+        assertEquals(5, resultData.size());
+        assertEquals(resultData.getObject(0).getInt("dateL"), 51);
+        assertEquals(resultData.getObject(4).getInt("dateL"), 55);
 
 
-        findQuery = new JSONObject().put("method", "findByIndex").put("argument", new JSONObject().put("name","201120").put("limit",7).put("where",new JSONObject().put("dateL",10).put("$op", "lte")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",7).put("where",new CSONObject().put("dateL",10).put("$op", "lte")));
         resultQuery = idxDB.executeQuery(findQuery);
         System.out.print("find lte(10), limit(7): ");
         System.out.println(resultQuery);
-        resultData = resultQuery.getJSONArray("data");
-        assertEquals(7, resultData.length());
-        assertEquals(resultData.getJSONObject(0).getInt("dateL"), 10);
-        assertEquals(resultData.getJSONObject(6).getInt("dateL"), 4);
+        resultData = resultQuery.getArray("data");
+        assertEquals(7, resultData.size());
+        assertEquals(resultData.getObject(0).getInt("dateL"), 10);
+        assertEquals(resultData.getObject(6).getInt("dateL"), 4);
 
 
-        findQuery = new JSONObject().put("method", "findByIndex").put("argument", new JSONObject().put("name","201120").put("limit",100000).put("where",new JSONObject().put("dateL",30).put("$op", "lt")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",100000).put("where",new CSONObject().put("dateL",30).put("$op", "lt")));
         resultQuery = idxDB.executeQuery(findQuery);
         System.out.print("find lt(30), limit(100000): ");
         System.out.println(resultQuery);
-        resultData = resultQuery.getJSONArray("data");
-        assertEquals(30, resultData.length());
-        assertEquals(resultData.getJSONObject(0).getInt("dateL"), 29);
-        assertEquals(resultData.getJSONObject(29).getInt("dateL"), 0);
+        resultData = resultQuery.getArray("data");
+        assertEquals(30, resultData.size());
+        assertEquals(resultData.getObject(0).getInt("dateL"), 29);
+        assertEquals(resultData.getObject(29).getInt("dateL"), 0);
 
 
         // remove
-        JSONObject removeQuery = new JSONObject().put("method", "removeByIndex").put("argument", new JSONObject().put("name","201120").put("where",new JSONObject().put("dateL",150).put("$op", "lt")));
+        CSONObject removeQuery = new CSONObject().put("method", "removeByIndex").put("argument", new CSONObject().put("name","201120").put("where",new CSONObject().put("dateL",150).put("$op", "lt")));
         resultQuery = idxDB.executeQuery(removeQuery);
         assertTrue(resultQuery.optBoolean("success"));
         System.out.print("remove: ");
         System.out.println(resultQuery);
-        assertEquals(resultQuery.optJSONArray("data").length(), 150);
+        assertEquals(resultQuery.optArray("data").size(), 150);
 
 
-        removeQuery = new JSONObject().put("method", "removeByIndex").put("argument", new JSONObject().put("name","201120").put("where",new JSONObject().put("dateL",150).put("$op", "lte")));
+        removeQuery = new CSONObject().put("method", "removeByIndex").put("argument", new CSONObject().put("name","201120").put("where",new CSONObject().put("dateL",150).put("$op", "lte")));
         resultQuery = idxDB.executeQuery(removeQuery);
         assertTrue(resultQuery.optBoolean("success"));
         System.out.print("remove: ");
         System.out.println(resultQuery);
-        assertEquals(resultQuery.optJSONArray("data").length(), 1);
+        assertEquals(resultQuery.optArray("data").size(), 1);
 
-        removeQuery = new JSONObject().put("method", "removeByIndex").put("argument", new JSONObject().put("name","201120").put("where",new JSONObject().put("dateL",151).put("$op", "eq")));
+        removeQuery = new CSONObject().put("method", "removeByIndex").put("argument", new CSONObject().put("name","201120").put("where",new CSONObject().put("dateL",151).put("$op", "eq")));
         resultQuery = idxDB.executeQuery(removeQuery);
         assertTrue(resultQuery.optBoolean("success"));
         System.out.print("remove: ");
         System.out.println(resultQuery);
-        assertEquals(resultQuery.optJSONArray("data").length(), 1);
+        assertEquals(resultQuery.optArray("data").size(), 1);
 
 
-        removeQuery = new JSONObject().put("method", "removeByIndex").put("argument", new JSONObject().put("name","201120").put("where",new JSONObject().put("dateL",191).put("$op", "gte")));
+        removeQuery = new CSONObject().put("method", "removeByIndex").put("argument", new CSONObject().put("name","201120").put("where",new CSONObject().put("dateL",191).put("$op", "gte")));
         resultQuery = idxDB.executeQuery(removeQuery);
         assertTrue(resultQuery.optBoolean("success"));
         System.out.print("remove: ");
         System.out.println(resultQuery);
-        assertEquals(9,resultQuery.optJSONArray("data").length());
+        assertEquals(9,resultQuery.optArray("data").size());
 
         // 크기 가져오기
-        JSONObject sizeQuery = new JSONObject().put("method", "size").put("argument", new JSONObject().put("name","201120"));
+        CSONObject sizeQuery = new CSONObject().put("method", "size").put("argument", new CSONObject().put("name","201120"));
         resultQuery = idxDB.executeQuery(sizeQuery);
         System.out.print("크기: ");
         System.out.println(resultQuery.optInt("data"));
@@ -237,17 +326,17 @@ class IdxDBTest {
         int size = resultQuery.optInt("data");
 
 
-        JSONObject getQuery = new JSONObject().put("method", "list").put("argument", new JSONObject().put("name","201120"));
+        CSONObject getQuery = new CSONObject().put("method", "list").put("argument", new CSONObject().put("name","201120"));
         resultQuery = idxDB.executeQuery(getQuery);
         System.out.print("list: ");
-        System.out.println(resultQuery.optJSONArray("data"));
-        assertEquals(resultQuery.optJSONArray("data").length(), size);
+        System.out.println(resultQuery.optArray("data"));
+        assertEquals(resultQuery.optArray("data").size(), size);
 
 
-        getQuery = new JSONObject().put("method", "list").put("argument", new JSONObject().put("name","201120").put("limit", 5).put("revers", true));
+        getQuery = new CSONObject().put("method", "list").put("argument", new CSONObject().put("name","201120").put("limit", 5).put("revers", true));
         resultQuery = idxDB.executeQuery(getQuery);
         System.out.print("revers list: ");
-        System.out.println(resultQuery.optJSONArray("data"));
+        System.out.println(resultQuery.optArray("data"));
 
 
         file.delete();

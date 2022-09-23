@@ -1,9 +1,6 @@
 package com.snoworca.cson;
 
-;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.util.*;
 
@@ -14,6 +11,12 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 		super(ElementType.Array);
 	}
 
+
+
+	public CSONArray(Collection<?> objects) {
+		super(ElementType.Array);
+		mList.addAll(objects);
+	}
 
 	private ArrayList<Object> mList = new ArrayList<Object>();
 	
@@ -56,12 +59,12 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 	public List<Object> toList() {
 		List<Object> results = new ArrayList<Object>(this.mList.size());
 		for (Object element : this.mList) {
-			if (element == null || JSONObject.NULL.equals(element)) {
+			if (element == null) {
 				results.add(null);
-			} else if (element instanceof JSONArray) {
-				results.add(((JSONArray) element).toList());
-			} else if (element instanceof JSONObject) {
-				results.add(((JSONObject) element).toMap());
+			} else if (element instanceof CSONArray) {
+				results.add(((CSONArray) element).toList());
+			} else if (element instanceof CSONObject) {
+				results.add(((CSONObject) element).toMap());
 			} else {
 				results.add(element);
 			}
@@ -188,7 +191,7 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 		
 	}
 	
-	public CSONObject getCSONObject(int index) {
+	public CSONObject getObject(int index) {
 		try {
 			return DataConverter.toObject(mList.get(index));
 		} catch (IndexOutOfBoundsException e) {
