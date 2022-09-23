@@ -78,13 +78,13 @@ public class IndexSet implements IndexCollection{
                     CSONObject csonObject = new CSONObject(buffer);
                     Object indexValue = csonObject.opt(indexKey);
                     CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, indexSort);
-                    csonItem.setFilePos(lastDataStorePos);
-                    csonItem.setFileStore(true);
+                    csonItem.setStoragePos(lastDataStorePos);
+                    csonItem.setStore(true);
                     itemSet.add(csonItem);
                 }
                 long count = 0;
                 for (CSONItem CSONItem : itemSet) {
-                    CSONItem.setFileStore(count > memCacheLimit);
+                    CSONItem.setStore(count > memCacheLimit);
                     ++count;
                 }
 
@@ -143,9 +143,7 @@ public class IndexSet implements IndexCollection{
 
     @Override
     public synchronized void commit() {
-        //TODO chagne 가 발생하지 않으면 commit 을 실행하지 않음.
         ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        //ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
         if(!isChanged && removeQueue.isEmpty()) {
             return;
         }
@@ -154,17 +152,17 @@ public class IndexSet implements IndexCollection{
             int count = 0;
             if(isChanged) {
                 for (CSONItem csonItem : itemSet) {
-                    long storePos = csonItem.getStorePos();
-                    if (csonItem.getStorePos() > 0 && csonItem.isChanged()) {
+                    long storePos = csonItem.getStoragePos();
+                    if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
                         try {
                             dataIO.unlink(storePos);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                        csonItem.setFilePos(-1);
+                        csonItem.setStoragePos(-1);
                     }
                     csonItem.storeFileIfNeed();
-                    csonItem.setFileStore(count > memCacheLimit);
+                    csonItem.setStore(count > memCacheLimit);
                     ++count;
                 }
                 isChanged = false;
@@ -460,7 +458,7 @@ public class IndexSet implements IndexCollection{
     }
 
     private void addPosInRemoveList(CSONItem item) {
-        long pos = item.getStorePos();
+        long pos = item.getStoragePos();
         if(pos > 0) {
             removeQueue.add(pos);
         }

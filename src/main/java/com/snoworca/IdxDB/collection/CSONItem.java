@@ -13,11 +13,23 @@ class CSONItem implements Comparable<CSONItem> {
         this.indexKey = key;
         this.sort = sort;
         this.csonObject = csonObject;
-        if(this.csonObject == null && storeDelegator != null) {
-            isFileCache = true;
-        }
+        /*if(this.csonObject == null && storeDelegator != null) {
+
+        }*/
         this.indexValue = csonObject.opt(indexKey);
     }
+
+    CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String key,Object indexValue) {
+        this.storeDelegator = storeDelegator;
+        this.indexKey = key;
+        this.sort = 1;
+        this.csonObject = csonObject;
+        /*if(this.csonObject == null && storeDelegator != null) {
+            isFileCache = true;
+        }*/
+        this.indexValue = indexValue;
+    }
+
 
     CSONItem(StoreDelegator storeDelegator, String key,Object indexValue, int sort) {
         this.storeDelegator = storeDelegator;
@@ -25,7 +37,7 @@ class CSONItem implements Comparable<CSONItem> {
         this.sort = sort;
         this.csonObject = csonObject;
         if(this.csonObject == null && storeDelegator != null) {
-            isFileCache = true;
+            isStorageSaved = true;
         }
         this.indexValue = indexValue;
     }
@@ -35,8 +47,8 @@ class CSONItem implements Comparable<CSONItem> {
     private String indexKey = null;
     private Object indexValue;
     private int sort = 0;
-    private boolean isFileCache = false;
-    private long filePos = -1;
+    private boolean isStorageSaved = false;
+    private long storagePos = -1;
     private StoreDelegator storeDelegator;
     private boolean isChanged = false;
 
@@ -47,9 +59,9 @@ class CSONItem implements Comparable<CSONItem> {
 
     public CSONObject getCsonObject() {
         if(csonObject == null) {
-            byte[] buffer = storeDelegator.load(filePos);
+            byte[] buffer = storeDelegator.load(storagePos);
             CSONObject loadJSON = new CSONObject(buffer);
-            if(!isFileCache) csonObject = loadJSON;
+            if(!isStorageSaved) csonObject = loadJSON;
             else return loadJSON;
         }
         return csonObject;
@@ -60,33 +72,36 @@ class CSONItem implements Comparable<CSONItem> {
         this.isChanged = true;
     }
 
-    public long getStorePos() {
-        return filePos;
+    public long getStoragePos() {
+        return storagePos;
     }
 
     public void storeFileIfNeed() {
-        if(filePos > -1) return;
-        filePos = storeDelegator.cache(csonObject.toByteArray());
-        isFileCache = true;
+        if(storagePos > -1) return;
+        storagePos = storeDelegator.cache(csonObject.toByteArray());
+        isStorageSaved = true;
     }
 
 
 
-    public void setFileStore(boolean fileCache) {
-        if(fileCache) {
-            if(this.csonObject != null && (!isFileCache || isChanged)) {
-                filePos = storeDelegator.cache(csonObject.toByteArray());
+    public void setStore(boolean enable) {
+        if(enable) {
+            if(this.csonObject != null && (!isStorageSaved || isChanged)) {
+                storagePos = storeDelegator.cache(csonObject.toByteArray());
             }
             this.csonObject = null;
         }
         else if(this.csonObject == null) {
             this.csonObject = getCsonObject();
         }
-        isFileCache = fileCache;
+        isStorageSaved = enable;
     }
 
-    protected void setFilePos(long pos) {
-        this.filePos = pos;
+    protected void setStoragePos(long pos) {
+        this.storagePos = pos;
+        if(pos > -1 && storeDelegator != null) {
+            isStorageSaved = true;
+        }
     }
 
 
@@ -127,7 +142,7 @@ class CSONItem implements Comparable<CSONItem> {
     public boolean equals(Object obj) {
         if(obj == this) return true;
         else if(obj == null) return false;
-        if(obj instanceof CSONItem && compareTo((CSONItem)obj) == 0) {
+        if(obj instanceof CSONItem && /*compareTo((CSONItem)obj) == 0*/ indexValue.equals(((CSONItem)obj).indexValue)) {
             return true;
         }
         return false;
@@ -139,6 +154,7 @@ class CSONItem implements Comparable<CSONItem> {
         if(obj == null) return 0;
         return obj.hashCode();
     }
+
 
 
 
