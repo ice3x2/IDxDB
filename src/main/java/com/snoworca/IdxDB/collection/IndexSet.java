@@ -413,47 +413,6 @@ public class IndexSet implements IndexCollection{
     }
 
 
-    /* 아직은 구현하지 않음.
-    @Override
-    public List<CSONObject> find(FindFilter findFilter, int limit) {
-        List<FindFilter> filters = findFilter.getSubFilters();
-        OP rootOP = null;
-        Collection<CSONObject>[] results;
-        if(filters == null && findFilter.getKey() != null) {
-            results = new Collection[1];
-            results[0] = new ArrayList<>();
-            filters = new ArrayList<>();
-            filters.add(findFilter);
-        }
-        else if(filters == null) {
-            return new ArrayList<>();
-        }
-        else {
-            results = new Collection[filters.size()];
-            rootOP = findFilter.getOp();
-            findFilter.getOp();
-        }
-        if (rootOP != OP.and && rootOP != OP.or && rootOP != OP.not && rootOP != OP.nor) {
-            rootOP = OP.and;
-        }
-
-        for(int i = 0, n = filters.size(); i < n; ++i) {
-            FindFilter filter = filters.get(i);
-            String key = filter.getKey();
-            Object value = filter.getValue();
-            OP op = filter.getOp();
-            if(indexKey.equals(key)) {
-                itemTreeSet.tailSet()
-            }
-        }
-
-        return null;
-    }
-    */
-
-
-
-
 
     private CSONItem makeIndexItem(Object index) {
         CSONObject indexJson = new CSONObject().put(indexKey, index);

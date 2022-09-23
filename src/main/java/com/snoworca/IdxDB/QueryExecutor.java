@@ -6,44 +6,55 @@ import com.snoworca.IdxDB.collection.IndexSetBuilder;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class QueryExecutor {
 
 
 
-    protected static CSONObject execute(IdxDB store, CSONObject jsonQuery) {
+    protected static CSONObject execute(IdxDB idxDB, CSONObject jsonQuery) {
         String method = jsonQuery.optString("method");
-        if(method == null) {
+        if (method == null) {
             return makeErrorCSONObject("No 'method' in the query.");
         }
         CSONObject argument = jsonQuery.optObject("argument");
-        if(argument == null || argument.isEmpty()) {
+        if (argument == null || argument.isEmpty()) {
             return makeErrorCSONObject("No object of 'argument' in query method '" + method + "'.");
         }
-        if("newIndexSet".equalsIgnoreCase(method)) {
-            return executeNewIndexTreeMethod(store, argument);
+        try {
+            if ("newIndexSet".equalsIgnoreCase(method)) {
+                return executeNewIndexSetMethod(idxDB, argument);
+            }
+            if ("dropCollection".equalsIgnoreCase(method)) {
+                return executeDropCollectionMethod(idxDB, argument);
+            } else if ("add".equalsIgnoreCase(method)) {
+                return executeAddMethod(idxDB, argument);
+            } else if ("findByIndex".equalsIgnoreCase(method) || "removeByIndex".equalsIgnoreCase(method)) {
+                return executeByIndexMethod(idxDB, argument, method);
+            } else if ("addOrReplace".equalsIgnoreCase(method)) {
+                return executeAddOrReplaceMethod(idxDB, argument);
+            } else if ("size".equalsIgnoreCase(method)) {
+                return executeSizeMethod(idxDB, argument);
+            } else if ("list".equalsIgnoreCase(method)) {
+                return executeListMethod(idxDB, argument);
+            }
+        } catch (Throwable e) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PrintStream printStream = new PrintStream(baos);
+            e.printStackTrace(printStream);
+            printStream.flush();
+            printStream.close();
+            return new CSONObject().put("isError", true).put("success", false).put("message", "Internal error: " +  new String(baos.toByteArray(), StandardCharsets.UTF_8));
         }
-        else if("add".equalsIgnoreCase(method)) {
-            return executeAddMethod(store, argument);
-        }
-        else if("findByIndex".equalsIgnoreCase(method) || "removeByIndex".equalsIgnoreCase(method)) {
-            return executeByIndexMethod(store, argument, method);
-        }
-        else if("addOrReplace".equalsIgnoreCase(method)) {
-            return executeAddOrReplaceMethod(store, argument);
-        }
-        else if("size".equalsIgnoreCase(method)) {
-            return executeSizeMethod(store,argument);
-        }
-        else if("list".equalsIgnoreCase(method)) {
-            return executeListMethod(store,argument);
-        }
-        return null;
+
+        return new CSONObject().put("isError", true).put("success", false).put("message", "Method '" + method + "' is undefined.");
     }
 
 
-    public static  CSONObject executeNewIndexTreeMethod(IdxDB store, CSONObject argument) {
+    public static  CSONObject executeNewIndexSetMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
         CSONObject index = argument.optObject("index");
         if(name == null || name.isEmpty()) {
@@ -55,7 +66,7 @@ public class QueryExecutor {
         if(store.get(name) != null) {
             return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
         }
-        IndexSetBuilder indexSetBuilder = store.newIndexTreeBuilder(name);
+        IndexSetBuilder indexSetBuilder = store.newIndexSetBuilder(name);
         String firstIndexKey = index.keySet().iterator().next();
         int sortMethod = index.optInteger(firstIndexKey, 1);
         int memCacheSize = index.optInteger("memCacheSize", 1000);
@@ -65,6 +76,17 @@ public class QueryExecutor {
         indexSetBuilder.setFileStore(isFileStore);
         indexSetBuilder.create();
         return new CSONObject().put("isError", false).put("success", true).put("message", "ok");
+    }
+
+    public static  CSONObject executeDropCollectionMethod(IdxDB store, CSONObject argument) {
+        String name = argument.optString("name");
+        if(name == null || name.isEmpty()) {
+            return makeErrorCSONObject("'name' is missing from the query argument.");
+        }
+        if(store.get(name) != null) {
+            return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
+        }
+        return new CSONObject().put("isError", false).put("success", store.dropCollection(name)).put("message", "ok");
     }
 
 

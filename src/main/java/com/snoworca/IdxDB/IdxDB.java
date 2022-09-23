@@ -22,6 +22,7 @@ public class IdxDB {
     private final static String META_INFO_TYPE_ENTRY = "entry";
 
     private ConcurrentHashMap<String, IndexCollection> indexCollectionMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
     private ReentrantLock collectionMutableLock = new ReentrantLock();
 
 
@@ -76,6 +77,8 @@ public class IdxDB {
                 DataBlock dataBlock = dataBlockIterator.next();
                 byte[] buffer = dataBlock.getData();
                 CSONObject csonObject = new CSONObject(buffer);
+                String name = csonObject.getString("name");
+                db.indexCollectionInfoStorePosMap.put(name, dataBlock.getPos());
                 if(IndexSet.class.getName().equals(csonObject.getString("className"))) {
                     IndexSet indexSet = new IndexSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
                     db.indexCollectionMap.put(indexSet.getName(), indexSet);
@@ -92,7 +95,26 @@ public class IdxDB {
             db.topStoreInfoStorePos = dataBlock.getPos();
         }
 
+    }
 
+
+    public boolean dropCollection(String collectionName) {
+
+        Long pos = indexCollectionInfoStorePosMap.remove(collectionName);
+        if(pos == null) {
+            return false;
+        }
+        try {
+            dataIO.unlink(pos);
+            IndexCollection indexCollection = indexCollectionMap.remove(collectionName);
+            if(indexCollection != null) {
+                indexCollection.clear();
+                indexCollection.commit();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return true;
     }
 
 
@@ -114,13 +136,13 @@ public class IdxDB {
 
 
 
-    public IndexSetBuilder newIndexTreeBuilder(String name) {
+    public IndexSetBuilder newIndexSetBuilder(String name) {
         CollectionCreateCallback callback = new CollectionCreateCallback() {
             @Override
             public void onCreate(IndexCollection indexCollection) {
-                String name = ((IndexSet)indexCollection).getName();
-                indexCollectionMap.put(name, (IndexCollection)indexCollection);
-                long headPos = ((IndexSet)indexCollection).getHeadPos();
+                String name = indexCollection.getName();
+                indexCollectionMap.put(name, indexCollection);
+                long headPos = indexCollection.getHeadPos();
                 CSONObject optionInfo = ((IndexSet)indexCollection).getOptionInfo();
                 optionInfo.put("headPos", headPos);
                 byte[] buffer = optionInfo.toByteArray();
@@ -131,6 +153,7 @@ public class IdxDB {
                     dataIO.setNextPos(lastPos, pos);
                     dataIO.setPrevPos(pos, lastPos);
                     dataIO.setPrevPos(0, -1);
+                    indexCollectionInfoStorePosMap.put(name, pos);
                     topStoreInfoStorePos = pos;
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -143,36 +166,19 @@ public class IdxDB {
 
 
 
-    public CSONObject executeQuery(CSONObject query) {
+    public CSONObject executeCSONQuery(CSONObject query) {
         return QueryExecutor.execute(this,query);
     }
 
+    public String executeQuery(String query) {
+        return QueryExecutor.execute(this,new CSONObject(query)).toString();
+    }
 
 
     public IndexCollection get(String name) {
         return indexCollectionMap.get(name);
     }
 
-    private StoreDelegator storeDelegator = new StoreDelegator() {
-        @Override
-        public long cache(byte[] buffer) {
-            try {
-
-                return dataIO.write(buffer).getPos();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        @Override
-        public byte[] load(long pos) {
-            try {
-                return dataIO.get(pos).getData();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    };
 
 
 
