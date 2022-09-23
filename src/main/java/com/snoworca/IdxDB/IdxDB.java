@@ -76,9 +76,9 @@ public class IdxDB {
                 DataBlock dataBlock = dataBlockIterator.next();
                 byte[] buffer = dataBlock.getData();
                 CSONObject csonObject = new CSONObject(buffer);
-                if(IndexTree.class.getName().equals(csonObject.getString("className"))) {
-                    IndexTree indexTree = new IndexTree(db.dataIO, IndexTreeOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexTree.getName(), indexTree);
+                if(IndexSet.class.getName().equals(csonObject.getString("className"))) {
+                    IndexSet indexSet = new IndexSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
+                    db.indexCollectionMap.put(indexSet.getName(), indexSet);
                 }
             }
 
@@ -114,14 +114,14 @@ public class IdxDB {
 
 
 
-    public IndexTreeBuilder newIndexTreeBuilder(String name) {
+    public IndexSetBuilder newIndexTreeBuilder(String name) {
         CollectionCreateCallback callback = new CollectionCreateCallback() {
             @Override
             public void onCreate(IndexCollection indexCollection) {
-                String name = ((IndexTree)indexCollection).getName();
+                String name = ((IndexSet)indexCollection).getName();
                 indexCollectionMap.put(name, (IndexCollection)indexCollection);
-                long headPos = ((IndexTree)indexCollection).getHeadPos();
-                CSONObject optionInfo = ((IndexTree)indexCollection).getOptionInfo();
+                long headPos = ((IndexSet)indexCollection).getHeadPos();
+                CSONObject optionInfo = ((IndexSet)indexCollection).getOptionInfo();
                 optionInfo.put("headPos", headPos);
                 byte[] buffer = optionInfo.toByteArray();
                 try {
@@ -138,7 +138,7 @@ public class IdxDB {
             }
         };
 
-        return new IndexTreeBuilder(callback, dataIO,name, collectionMutableLock);
+        return new IndexSetBuilder(callback, dataIO,name, collectionMutableLock);
     }
 
 

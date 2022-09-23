@@ -44,3 +44,4 @@ bin/
 
 ### test DB 파일 ###
 *.dat
+*.db

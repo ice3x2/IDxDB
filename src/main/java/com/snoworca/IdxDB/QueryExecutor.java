@@ -2,7 +2,7 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
-import com.snoworca.IdxDB.collection.IndexTreeBuilder;
+import com.snoworca.IdxDB.collection.IndexSetBuilder;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
@@ -21,8 +21,8 @@ public class QueryExecutor {
         if(argument == null || argument.isEmpty()) {
             return makeErrorCSONObject("No object of 'argument' in query method '" + method + "'.");
         }
-        if("createSet".equalsIgnoreCase(method)) {
-            return executeCreateSetMethod(store, argument);
+        if("newIndexSet".equalsIgnoreCase(method)) {
+            return executeNewIndexTreeMethod(store, argument);
         }
         else if("add".equalsIgnoreCase(method)) {
             return executeAddMethod(store, argument);
@@ -43,9 +43,8 @@ public class QueryExecutor {
     }
 
 
-    public static  CSONObject executeCreateSetMethod(IdxDB store, CSONObject argument) {
+    public static  CSONObject executeNewIndexTreeMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
-        int limit = argument.optInteger("limit", Short.MAX_VALUE * 2);
         CSONObject index = argument.optObject("index");
         if(name == null || name.isEmpty()) {
             return makeErrorCSONObject("'name' is missing from the query argument.");
@@ -56,11 +55,15 @@ public class QueryExecutor {
         if(store.get(name) != null) {
             return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
         }
-        IndexTreeBuilder indexTreeBuilder = store.newIndexTreeBuilder(name).memCacheSize(limit);
+        IndexSetBuilder indexSetBuilder = store.newIndexTreeBuilder(name);
         String firstIndexKey = index.keySet().iterator().next();
         int sortMethod = index.optInteger(firstIndexKey, 1);
-        indexTreeBuilder.index(firstIndexKey, sortMethod);
-        indexTreeBuilder.create();
+        int memCacheSize = index.optInteger("memCacheSize", 1000);
+        boolean isFileStore = index.optBoolean("fileStore", true);
+        indexSetBuilder.index(firstIndexKey, sortMethod);
+        indexSetBuilder.memCacheSize(memCacheSize);
+        indexSetBuilder.setFileStore(isFileStore);
+        indexSetBuilder.create();
         return new CSONObject().put("isError", false).put("success", true).put("message", "ok");
     }
 

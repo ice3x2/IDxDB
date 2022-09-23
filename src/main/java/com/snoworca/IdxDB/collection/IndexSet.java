@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class IndexTree implements IndexCollection{
+public class IndexSet implements IndexCollection{
 
     private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
@@ -35,7 +35,7 @@ public class IndexTree implements IndexCollection{
 
 
 
-    public IndexTree(DataIO dataIO, IndexTreeOption option) {
+    public IndexSet(DataIO dataIO, IndexSetOption option) {
         ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
         lock.lock();
         try {
