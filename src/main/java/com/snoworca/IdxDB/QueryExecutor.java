@@ -108,7 +108,7 @@ public class QueryExecutor {
     }
 
 
-    public static  CSONObject executeAddMethod(IdxDB store, CSONObject argument) {
+    public static CSONObject executeAddMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
         Object data = argument.opt("data");
         IndexCollection indexCollection = null;
@@ -134,8 +134,8 @@ public class QueryExecutor {
             }
             isSuccess = indexCollection.addAll((CSONArray) data);
         }
-        indexCollection.commit();
-        return new CSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail");
+        CSONObject result = indexCollection.commit().toCsonObject();
+        return new CSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail").put("result", result);
     }
 
     public static  CSONObject executeSizeMethod(IdxDB store, CSONObject argument) {
@@ -177,8 +177,8 @@ public class QueryExecutor {
             }
             isSuccess = indexCollection.addOrReplaceAll((CSONArray) data);
         }
-        indexCollection.commit();
-        return new CSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail");
+        CSONObject result = indexCollection.commit().toCsonObject();
+        return new CSONObject().put("isError", false).put("success", isSuccess).put("message", isSuccess ? "ok" : "fail").put("result", result);
     }
 
 
@@ -234,13 +234,14 @@ public class QueryExecutor {
         if("findByIndex".equalsIgnoreCase(method)) {
             List<CSONObject> list = indexCollection.findByIndex(indexValue,findOption,limit);
             data = new CSONArray(list);
+            return new CSONObject().put("isError", false).put("success","ok").put("data", data);
         } else {
-            List<Object> list = indexCollection.removeByIndex(indexValue,findOption);
-            data = new CSONArray(list);
-            indexCollection.commit();
+            indexCollection.removeByIndex(indexValue,findOption);
+            CSONObject result = indexCollection.commit().toCsonObject();
+            return new CSONObject().put("isError", false).put("success",true).put("message", "ok").put("result", result);
         }
 
-        return new CSONObject().put("isError", false).put("success", !data.isEmpty()).put("message","ok").put("data", data);
+
     }
 
 

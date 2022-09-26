@@ -113,7 +113,7 @@ public class CSONObject extends CSONElement {
 	public int optInteger(String key, int def) {
 		Object obj = mDataMap.get(key);
 		if(obj == null) return def;
-		return DataConverter.toInteger(obj);
+		return DataConverter.toInteger(obj,def);
 	}
 
 	public int optInteger(String key) {
@@ -123,7 +123,7 @@ public class CSONObject extends CSONElement {
 	public long optLong(String key, long def) {
 		Object obj = mDataMap.get(key);
 		if(obj == null) return def;
-		return DataConverter.toLong(obj);
+		return DataConverter.toLong(obj,def);
 	}
 
 	public boolean isEmpty() {

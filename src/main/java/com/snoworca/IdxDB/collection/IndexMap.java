@@ -94,8 +94,7 @@ public class IndexMap extends IndexCollectionBase {
     }
 
     @Override
-    public List<Object> removeByIndex(Object start, FindOption options) {
-        return null;
+    public void removeByIndex(Object start, FindOption options) {
     }
 
     @Override
@@ -116,7 +115,8 @@ public class IndexMap extends IndexCollectionBase {
     }
 
     @Override
-    public void commit() {
+    public CommitResult commit() {
+        return null;
 
     }
 
@@ -135,6 +135,21 @@ public class IndexMap extends IndexCollectionBase {
     @Override
     public boolean remove(CSONObject o) {
         return false;
+    }
+
+    @Override
+    protected void onInit() {
+
+    }
+
+    @Override
+    protected void onRestoreCSONItem(CSONItem csonItem) {
+
+    }
+
+    @Override
+    protected Iterator<CSONItem> getCSONItemIterator() {
+        return null;
     }
 
     @Override

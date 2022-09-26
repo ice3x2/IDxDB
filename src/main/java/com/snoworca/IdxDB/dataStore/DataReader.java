@@ -85,9 +85,6 @@ public class DataReader {
 
 
     public void seek(long pos) throws IOException {
-        if(this.currentPos == pos) {
-            return;
-        }
         if(pos >= randomAccessFile.length()) {
             reopen();
         }

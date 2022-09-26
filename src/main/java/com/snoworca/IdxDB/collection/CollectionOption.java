@@ -20,8 +20,13 @@ public class CollectionOption {
         csonObject.put("sort" , sort);
     }
 
+
     public String getIndexKey() {
         return toCsonObject().optString("indexKey");
+    }
+
+    public int getIndexSort() {
+        return toCsonObject().optInteger("sort", 1);
     }
 
     public String getName() {
@@ -59,6 +64,15 @@ public class CollectionOption {
     public void fromCsonObject(CSONObject csonObject) {
         this.option = csonObject;
     }
+
+    public void setMemCacheSize(int size) {
+        toCsonObject().put("memCacheSize", size);
+    }
+
+    public int getMemCacheSize() {
+        return toCsonObject().optInteger("memCacheSize", 100);
+    }
+
 
 
 }

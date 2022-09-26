@@ -2,14 +2,20 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.dataStore.DataBlock;
 import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.TreeSet;
+import java.lang.reflect.Array;
+import java.util.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 abstract class IndexCollectionBase implements IndexCollection {
 
+    private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    private ReentrantReadWriteLock readWriteTransactionTempLock = new ReentrantReadWriteLock();
+    private ArrayList<TransactionOrder> transactionOrders = new ArrayList<>();
+
+    private final int memCacheLimit;
     private DataIO dataIO;
     private String name;
     private boolean isFileStore;
@@ -19,6 +25,10 @@ abstract class IndexCollectionBase implements IndexCollection {
     private StoreDelegator storeDelegator;
 
     private String indexKey;
+    private int sort;
+    private long headPos = -1;
+
+    private CollectionOption collectionOption;
 
     IndexCollectionBase(DataIO dataIO, CollectionOption collectionOption) {
         this.dataIO = dataIO;
@@ -26,12 +36,232 @@ abstract class IndexCollectionBase implements IndexCollection {
         this.isFileStore = collectionOption.isFileStore();
         this.memCacheSize = 0;
         this.indexKey = collectionOption.getIndexKey();
+        this.sort = collectionOption.getIndexSort();
+        this.memCacheLimit = collectionOption.getMemCacheSize();
+        this.headPos = collectionOption.getHeadPos();
+        onInit();
+        if (this.dataIO != null) {
+            makeStoreDelegatorImpl();
+        }
+        initData();
+        this.collectionOption = collectionOption;
+    }
+
+    protected abstract void onInit();
+
+    protected abstract void onRestoreCSONItem(CSONItem csonItem);
+    protected abstract Iterator<CSONItem> getCSONItemIterator();
+
+    public CSONObject getOptionInfo() {
+        return new CSONObject(collectionOption.toCsonObject().toByteArray());
+    }
+
+    private void initData() {
+        try {
+            if(headPos < 1) {
+                DataBlock headBlock = dataIO.write(new CSONObject().toByteArray());
+                lastDataStorePos = headPos = headBlock.getPos();
+            } else {
+                Iterator<DataBlock> dataBlockIterator = dataIO.iterator(headPos);
+                boolean header = true;
+                while(dataBlockIterator.hasNext()) {
+                    DataBlock dataBlock = dataBlockIterator.next();
+                    if(header) {
+                        header = false;
+                        continue;
+                    }
+                    byte[] buffer = dataBlock.getData();
+                    lastDataStorePos = dataBlock.getPos();
+                    CSONObject csonObject = new CSONObject(buffer);
+                    Object indexValue = csonObject.opt(indexKey);
+                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, sort);
+                    csonItem.setStoragePos(lastDataStorePos);
+                    csonItem.setStore(true);
+                    onRestoreCSONItem(csonItem);
+                }
+                long count = 0;
+                Iterator<CSONItem> csonItemIterator = getCSONItemIterator();
+                while(csonItemIterator.hasNext()) {
+                    CSONItem csonItem = csonItemIterator.next();
+                    csonItem.setStore(count > memCacheLimit);
+                    ++count;
+                }
+
+
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    protected boolean unlink(CSONItem item) throws IOException {
+        if(item == null || item.getStoragePos() < 0) return false;
+        if(dataIO != null) {
+            dataIO.unlink(item.getStoragePos());
+        }
+        return true;
+    }
+
+    protected String getIndexKey() {
+        return indexKey;
+    }
+
+    protected int getSort() {
+        return sort;
+    }
+
+    protected boolean checkIndexKey(CSONObject csonObject) {
+        return csonObject != null && csonObject.opt(indexKey) != null;
+    }
+
+    @Override
+    public long getHeadPos() {
+        return headPos;
+    }
+
+    @Override
+    public void rollback() {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        transactionOrders.clear();
+        writeLock.unlock();
     }
 
     protected int getMemCacheSize() {
         return memCacheSize;
     }
 
+    protected void addTransactionOrder(CSONObject csonObject) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_ADD, item));
+        writeLock.unlock();
+    }
+
+    protected void addOrReplaceTransactionOrder(CSONObject csonObject) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, item));
+        writeLock.unlock();
+    }
+
+
+
+    protected void addOrReplaceAllTransactionOrder(Collection<CSONObject> csonObjects) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        ArrayList<TransactionOrder> list = new ArrayList<>(csonObjects.size());
+        if(csonObjects instanceof  ArrayList) {
+            for (int i = 0, n = csonObjects.size(); i < n; ++i) {
+                CSONItem item = new CSONItem(storeDelegator, ((ArrayList<CSONObject>) csonObjects).get(i), indexKey, sort);
+                list.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, item));
+            }
+
+        } else {
+            for(CSONObject csonObject : csonObjects) {
+                CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+                list.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, item));
+            }
+        }
+        writeLock.lock();
+        transactionOrders.addAll(list);
+        writeLock.unlock();
+    }
+
+    protected ArrayList<TransactionOrder> getTransactionOrders() {
+        ReentrantReadWriteLock.WriteLock lock = readWriteTransactionTempLock.writeLock();
+        lock.lock();
+        try {
+            ArrayList<TransactionOrder> result = new ArrayList<>(transactionOrders);
+            transactionOrders.clear();
+            return result;
+        } finally {
+            lock.unlock();;
+        }
+
+    }
+
+    protected void addAllTransactionOrder(Collection<CSONObject> csonObjects) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        ArrayList<TransactionOrder> list = new ArrayList<>(csonObjects.size());
+        if(csonObjects instanceof  ArrayList) {
+            for (int i = 0, n = csonObjects.size(); i < n; ++i) {
+                CSONItem item = new CSONItem(storeDelegator, ((ArrayList<CSONObject>) csonObjects).get(i), indexKey, sort);
+                list.add(new TransactionOrder(TransactionOrder.ORDER_ADD, item));
+            }
+
+        } else {
+            for(CSONObject csonObject : csonObjects) {
+                CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+                list.add(new TransactionOrder(TransactionOrder.ORDER_ADD, item));
+            }
+        }
+        writeLock.lock();
+        transactionOrders.addAll(list);
+        writeLock.unlock();
+    }
+
+    protected void replaceTransactionOrder(CSONObject csonObject) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_REPLACE, item));
+        writeLock.unlock();
+    }
+
+    protected void removeTransactionOrder(CSONObject csonObject) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_REMOVE, item));
+        writeLock.unlock();
+    }
+
+    protected void removeTransactionOrder(Collection<CSONItem> csonItem) {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        if(csonItem instanceof ArrayList) {
+            for(int i = 0, n = csonItem.size(); i < n; ++i) {
+                transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_REMOVE, ((ArrayList<CSONItem>) csonItem).get(i)));
+            }
+        } else {
+            for(CSONItem item : csonItem) {
+                transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_REMOVE, item));
+            }
+        }
+
+        writeLock.unlock();
+    }
+
+    protected void clearTransactionOrder() {
+        ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
+        writeLock.lock();
+        transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_CLEAR, null));
+        writeLock.unlock();
+    }
+
+
+    protected void writeLock() {
+        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
+        lock.lock();
+    }
+
+    protected void writeUnlock() {
+        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
+        lock.unlock();
+    }
+
+    protected void readLock() {
+        ReentrantReadWriteLock.ReadLock lock = readWriteLock.readLock();
+        lock.lock();
+    }
+
+    protected void readUnlock() {
+        ReentrantReadWriteLock.ReadLock lock = readWriteLock.readLock();
+        lock.unlock();
+    }
 
     @Override
     public String getName() {

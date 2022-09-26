@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.exception.MissingIndexValueException;
 import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
@@ -17,6 +18,9 @@ class CSONItem implements Comparable<CSONItem> {
 
         }*/
         this.indexValue = csonObject.opt(indexKey);
+        if(this.indexValue == null) {
+            throw new MissingIndexValueException(indexKey, csonObject);
+        }
     }
 
     CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String key,Object indexValue) {
@@ -76,10 +80,16 @@ class CSONItem implements Comparable<CSONItem> {
         return storagePos;
     }
 
-    public void storeFileIfNeed() {
+    public void storeIfNeed() {
         if(storagePos > -1) return;
         storagePos = storeDelegator.cache(csonObject.toByteArray());
         isStorageSaved = true;
+    }
+
+    public void release() {
+        storagePos = -1;
+        csonObject = null;
+        storeDelegator = null;
     }
 
 

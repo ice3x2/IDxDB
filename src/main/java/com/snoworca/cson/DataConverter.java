@@ -20,100 +20,117 @@ class DataConverter {
 		}
 		return null; 
 	}
-	
-	final static  int toInteger(Object value) {
-		if(value instanceof Number) {
-			return ((Number)value).intValue();
-		}
-		else if(value instanceof Character) {
-			return ((Character)value).charValue();
-		}
-		else if(value instanceof Boolean) {
-			return ((Boolean)value) ? 1 : 0;
-		}
-		else if(value instanceof String) {
-			return Integer.parseInt((String) value);
-		} 
-		else if(value instanceof byte[] && ((byte[])value).length > 3 ) {
-  			return ByteBuffer.wrap((byte[])value).getInt();
-		} 
-		return 0;
+
+	final static int toInteger(Object value) {
+		return toInteger(value, 0);
 	}
 	
-	final static  short toShort(Object value) {
-		if(value instanceof Number) {
-			return ((Number)value).shortValue();
-		}
-		else if(value instanceof Character) {
-			return (short)((Character)value).charValue();
-		}
-		else if(value instanceof String) {
-			return Short.parseShort((String) value);
-		} 
-		else if(value instanceof byte[] && ((byte[])value).length > 1 ) {
-  			return ByteBuffer.wrap((byte[])value).getShort();
-		} 
-		return 0;
+	final static int toInteger(Object value, int def) {
+		try {
+			if (value instanceof Number) {
+				return ((Number) value).intValue();
+			} else if (value instanceof Character) {
+				return ((Character) value).charValue();
+			} else if (value instanceof Boolean) {
+				return ((Boolean) value) ? 1 : 0;
+			} else if (value instanceof String) {
+				return Integer.parseInt((String) value);
+			} else if (value instanceof byte[] && ((byte[]) value).length > 3) {
+				return ByteBuffer.wrap((byte[]) value).getInt();
+			}
+		} catch (Throwable e) {}
+		return def;
+
+	}
+
+	final static short toShort(Object value) {
+		return toShort(value, (short) 0);
 	}
 	
-	
-	
+	final static short toShort(Object value, short def) {
+		try {
+			if (value instanceof Number) {
+				return ((Number) value).shortValue();
+			} else if (value instanceof Character) {
+				return (short) ((Character) value).charValue();
+			} else if (value instanceof String) {
+				return Short.parseShort((String) value);
+			} else if (value instanceof byte[] && ((byte[]) value).length > 1) {
+				return ByteBuffer.wrap((byte[]) value).getShort();
+			}
+		} catch (Throwable e) {}
+		return def;
+	}
+
+
 	final static float toFloat(Object value) {
-		if(value instanceof Number) {
-			return ((Number)value).floatValue();
-		}
-		else if(value instanceof Character) {
-			return ((Character)value).charValue();
-		}
-		else if(value instanceof Boolean) {
-			return ((Boolean)value) ? 1 : 0;
-		}
-		else if(value instanceof String) {
-			return Float.parseFloat((String) value);
-		} 
-		else if(value instanceof byte[] && ((byte[])value).length > 3 ) {
-  			return ByteBuffer.wrap((byte[])value).getFloat();
-		} 
-		return 0;
+		return toFloat(value, 0);
 	}
 	
+	final static float toFloat(Object value, float def) {
+		try {
+			if (value instanceof Number) {
+				return ((Number) value).floatValue();
+			} else if (value instanceof Character) {
+				return ((Character) value).charValue();
+			} else if (value instanceof Boolean) {
+				return ((Boolean) value) ? 1 : 0;
+			} else if (value instanceof String) {
+				return Float.parseFloat((String) value);
+			} else if (value instanceof byte[] && ((byte[]) value).length > 3) {
+				return ByteBuffer.wrap((byte[]) value).getFloat();
+			}
+		}catch (Throwable e) {}
+		return def;
+	}
+
 	final static double toDouble(Object value) {
-		if(value instanceof Number) {
-			return ((Number)value).doubleValue();
-		}
-		else if(value instanceof Character) {
-			return ((Character)value).charValue();
-		}
-		else if(value instanceof String) {
-			return Double.parseDouble((String) value);
-		} 
-		else if(value instanceof byte[] && ((byte[])value).length > 7 ) {
-  			return ByteBuffer.wrap((byte[])value).getDouble();
-		} 
-		return 0;
+		return toDouble(value, 0);
 	}
 	
-	
+	final static double toDouble(Object value, double def) {
+		try {
+			if (value instanceof Number) {
+				return ((Number) value).doubleValue();
+			} else if (value instanceof Character) {
+				return ((Character) value).charValue();
+			} else if (value instanceof String) {
+				return Double.parseDouble((String) value);
+			} else if (value instanceof byte[] && ((byte[]) value).length > 7) {
+				return ByteBuffer.wrap((byte[]) value).getDouble();
+			}
+		} catch (Throwable e) {}
+		return def;
+	}
+
 	final static long toLong(Object value) {
-		if(value instanceof Number) {
-			return ((Number)value).longValue();
-		}
-		else if(value instanceof Character) {
-			return ((Character)value).charValue();
-		}
-		else if(value instanceof Boolean) {
-			return ((Boolean)value) ? 1 : 0;
-		}
-		else if(value instanceof String) {
-  			return Long.parseLong((String) value);
-		} 
-		else if(value instanceof byte[] && ((byte[])value).length > 7 ) {
-  			return ByteBuffer.wrap((byte[])value).getLong();
-		} 
-		return 0;
+		return toLong(value, 0L);
 	}
 	
+	
+	final static long toLong(Object value, long def) {
+
+		try {
+			if (value instanceof Number) {
+				return ((Number) value).longValue();
+			} else if (value instanceof Character) {
+				return ((Character) value).charValue();
+			} else if (value instanceof Boolean) {
+				return ((Boolean) value) ? 1 : 0;
+			} else if (value instanceof String) {
+				return Long.parseLong((String) value);
+			} else if (value instanceof byte[] && ((byte[]) value).length > 7) {
+				return ByteBuffer.wrap((byte[]) value).getLong();
+			}
+		} catch (Throwable e) {}
+		return def;
+	}
+
 	final static char toChar(Object value) {
+		return toChar(value, '\0');
+	}
+	
+	final static char toChar(Object value, char def) {
 		if(value instanceof Number) {
 			return (char)((Number)value).shortValue();
 		}
@@ -129,7 +146,7 @@ class DataConverter {
 		else if(value instanceof byte[] && ((byte[])value).length > 1 ) {
   			return (char) ByteBuffer.wrap((byte[])value).getShort();
 		} 
-		return (char)0;
+		return def;
 	}
 	
 	
@@ -148,19 +165,24 @@ class DataConverter {
 		} 
 		return value + "";
 	}
-	
+
 	final static  boolean toBoolean(Object value) {
-		if(value instanceof Boolean) {
-			return ((Boolean)value);
-		}
-		else if(value instanceof Number) {
-			return ((Number) value).intValue() > 0;
-		} 
-		else if(value instanceof String) {
-			String strValue = ((String)value).trim();
-			return ("true".equalsIgnoreCase(strValue) ||  "1".equals(strValue));
-		}
-		return false; 
+		return toBoolean(value, false);
+
+	}
+	
+	final static  boolean toBoolean(Object value, boolean def) {
+		try {
+			if (value instanceof Boolean) {
+				return ((Boolean) value);
+			} else if (value instanceof Number) {
+				return ((Number) value).intValue() > 0;
+			} else if (value instanceof String) {
+				String strValue = ((String) value).trim();
+				return ("true".equalsIgnoreCase(strValue) || "1".equals(strValue));
+			}
+		}catch (Throwable e) {}
+		return def;
 	}
 	
 	

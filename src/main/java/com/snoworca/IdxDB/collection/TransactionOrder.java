@@ -6,6 +6,8 @@ class TransactionOrder {
     final static int ORDER_REPLACE = 3;
     final static int ORDER_REMOVE = 4;
 
+    final static int ORDER_CLEAR = 5;
+
     private int order;
     private CSONItem item;
 

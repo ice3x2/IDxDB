@@ -235,7 +235,8 @@ public class DataIO {
 
 
     public DataBlock write(byte[] buffer) throws IOException {
-        return write(DataBlock.newDataBlock(buffer));
+        DataBlock block = write(DataBlock.newDataBlock(buffer));
+        return block;
     }
     private DataBlock write(DataBlock dataBlock) throws IOException {
         try {

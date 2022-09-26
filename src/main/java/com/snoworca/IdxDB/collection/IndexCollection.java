@@ -25,13 +25,16 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     public List<CSONObject> findByIndex(Object start,FindOption options,int limit);
 
-    public List<Object> removeByIndex(Object start,FindOption options);
+    public void removeByIndex(Object start, FindOption options);
 
     public List<CSONObject> list(int limit,boolean reverse);
 
     public int size();
 
-    public void commit();
+    public CommitResult commit();
+
+    public void rollback();
+
 
     public boolean isEmpty();
     public boolean remove(CSONObject o);

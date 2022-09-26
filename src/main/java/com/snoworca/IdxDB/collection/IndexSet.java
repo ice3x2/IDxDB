@@ -2,223 +2,185 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.dataStore.DataBlock;
 import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class IndexSet implements IndexCollection{
+public class IndexSet extends IndexCollectionBase {
 
-    private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    private TreeSet<CSONItem> itemSet;
 
-    private String name;
-
-    private final int memCacheLimit;
-    private String indexKey = "";
-    private TreeSet<String> indexKeySet;
-    private int indexSort = 0;
-    private TreeSet<CSONItem> itemSet = new TreeSet<>();
-    private ConcurrentLinkedQueue<Long> removeQueue = new ConcurrentLinkedQueue<>();
-    private DataIO dataIO;
     private StoreDelegator storeDelegator;
+    private String indexKey;
+    private int indexSort;
 
-    private long lastDataStorePos = -1;
-
-    private long headPos = -1;
-    private CSONObject optionInfo;
-    private volatile boolean isChanged = false;
 
 
 
     public IndexSet(DataIO dataIO, IndexSetOption option) {
-        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        lock.lock();
-        try {
-            this.indexKey = option.getIndexKey();
-            this.indexSort = option.getIndexSort();
-            this.memCacheLimit = option.getMemCacheSize();
-            this.dataIO = option.isFileStore() ? dataIO : null;
-            this.name = option.getName();
-            if (this.dataIO != null) {
-                makeStoreDelegatorImpl();
-            }
-            this.headPos = option.getHeadPos();
-            initData();
-            optionInfo = option.toCsonObject();
-        } finally {
-            lock.unlock();
-        }
+        super(dataIO, option);
+        this.indexKey = super.getIndexKey();
+        this.storeDelegator = super.getStoreDelegator();
+        this.indexSort = super.getSort();
+
+
     }
 
-    public CSONObject getOptionInfo() {
-        return new CSONObject(optionInfo.toByteArray());
-    }
 
-    private void initData() {
-        try {
-            if(headPos < 1) {
-                DataBlock headBlock = dataIO.write(new byte[]{0});
-                lastDataStorePos = headPos = headBlock.getPos();
-            } else {
-                Iterator<DataBlock> dataBlockIterator = dataIO.iterator(headPos);
-                boolean header = true;
-                while(dataBlockIterator.hasNext()) {
-                    DataBlock dataBlock = dataBlockIterator.next();
-                    if(header) {
-                        header = false;
-                        continue;
-                    }
-                    byte[] buffer = dataBlock.getData();
-                    lastDataStorePos = dataBlock.getPos();
-                    CSONObject csonObject = new CSONObject(buffer);
-                    Object indexValue = csonObject.opt(indexKey);
-                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, indexSort);
-                    csonItem.setStoragePos(lastDataStorePos);
-                    csonItem.setStore(true);
-                    itemSet.add(csonItem);
-                }
-                long count = 0;
-                for (CSONItem CSONItem : itemSet) {
-                    CSONItem.setStore(count > memCacheLimit);
-                    ++count;
-                }
-
-
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    @Override
+    protected void onInit() {
+        itemSet = new TreeSet<>();
     }
 
     @Override
-    public long getHeadPos() {
-        return headPos;
+    protected void onRestoreCSONItem(CSONItem csonItem) {
+        itemSet.add(csonItem);
     }
 
-
-    private void makeStoreDelegatorImpl() {
-        storeDelegator = new StoreDelegator() {
-            @Override
-            public long cache(byte[] buffer) {
-                try {
-                    DataBlock dataBlock = dataIO.write(buffer);
-                    long dataPos = dataBlock.getPos();
-                    dataIO.setNextPos(lastDataStorePos, dataPos);
-                    dataIO.setPrevPos(dataPos, lastDataStorePos);
-                    lastDataStorePos = dataPos;
-                    return dataPos;
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-
-            @Override
-            public byte[] load(long pos) {
-                try {
-                    DataBlock dataBlock = dataIO.get(pos);
-                    return dataBlock.getData();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
+    @Override
+    protected Iterator<CSONItem> getCSONItemIterator() {
+        Iterator<CSONItem> iterator = itemSet.iterator();
+        return iterator;
     }
 
 
 
     @Override
     public int size() {
-        //ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
-        lock.lock();
+        readLock();
         int size = itemSet.size();
-        lock.unlock();
+        readUnlock();
         return size;
     }
 
+
+
     @Override
-    public synchronized void commit() {
-        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        if(!isChanged && removeQueue.isEmpty()) {
-            return;
-        }
-        lock.lock();
+    public synchronized CommitResult commit() {
+
+        ArrayList<TransactionOrder> transactionOrders = getTransactionOrders();
+        writeLock();
+        CommitResult commitResult = new CommitResult();
         try {
-            int count = 0;
-            if(isChanged) {
-                for (CSONItem csonItem : itemSet) {
-                    long storePos = csonItem.getStoragePos();
-                    if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
-                        try {
-                            dataIO.unlink(storePos);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
+            if(transactionOrders.isEmpty()) {
+                return commitResult;
+            }
+            boolean indexChanged = false;
+            for(int i = 0, n = transactionOrders.size(); i < n; ++i) {
+                TransactionOrder transactionOrder = transactionOrders.get(i);
+                CSONItem item = transactionOrder.getItem();
+                switch (transactionOrder.getOrder()) {
+                    case TransactionOrder.ORDER_ADD:
+                        if(itemSet.add(item)) commitResult.incrementCountOfAdd();
+                        item.storeIfNeed();
+                        indexChanged = true;
+                    break;
+                    case TransactionOrder.ORDER_REMOVE:
+                        if(item.getStoragePos() < 0) {
+                            CSONItem realItem = get_(item.getCsonObject());
+                            if(realItem != null) item = realItem;
                         }
-                        csonItem.setStoragePos(-1);
-                    }
-                    csonItem.storeFileIfNeed();
-                    csonItem.setStore(count > memCacheLimit);
-                    ++count;
+                        if(itemSet.remove(item)) {
+                            commitResult.incrementCountOfRemove();
+                        }
+                        unlink(item);
+                        item.release();
+                        indexChanged = true;
+                    break;
+                    case TransactionOrder.ORDER_CLEAR:
+                        for(CSONItem clearItem : itemSet) {
+                            unlink(clearItem);
+                            clearItem.release();
+                            commitResult.incrementCountOfRemove();
+                        }
+                        itemSet.clear();
+                    break;
+                    case TransactionOrder.ORDER_ADD_OR_REPLACE:
+                        CSONObject addOrReplaceCsonObject = item.getCsonObject();
+                        CSONItem foundItemOfAddOrReplace = get_(addOrReplaceCsonObject);
+                        if(foundItemOfAddOrReplace == null) {
+                            itemSet.add(item);
+                            item.storeIfNeed();
+                            commitResult.incrementCountOfAdd();
+                        } else {
+                            if(foundItemOfAddOrReplace.getStoragePos() < 0) {
+                                CSONItem foundItemOfAddOrReplaceReal = get_(foundItemOfAddOrReplace.getCsonObject());
+                                if(foundItemOfAddOrReplaceReal != null) {
+                                    foundItemOfAddOrReplace = foundItemOfAddOrReplaceReal;
+                                }
+                            }
+                            unlink(foundItemOfAddOrReplace);
+                            foundItemOfAddOrReplace.setStoragePos(-1);
+                            foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
+                            foundItemOfAddOrReplace.storeIfNeed();
+                            commitResult.incrementCountOfReplace();
+                        }
+
+                    break;
+                    case TransactionOrder.ORDER_REPLACE:
+                        CSONObject replaceCsonObject = item.getCsonObject();
+                        CSONItem foundItemOfReplace = get_(replaceCsonObject);
+                        if(foundItemOfReplace != null) {
+                            if(foundItemOfReplace.getStoragePos() < 0) {
+                                CSONItem foundItemOfReplaceReal = get_(foundItemOfReplace.getCsonObject());
+                                if(foundItemOfReplaceReal != null) {
+                                    foundItemOfReplace = foundItemOfReplaceReal;
+                                }
+                            }
+                            unlink(foundItemOfReplace);
+                            foundItemOfReplace.setStoragePos(-1);
+                            foundItemOfReplace.setCsonObject(replaceCsonObject);
+                            foundItemOfReplace.storeIfNeed();
+                            commitResult.incrementCountOfReplace();
+                        }
+                    break;
                 }
-                isChanged = false;
             }
-            ArrayList<Long> removeList = new ArrayList<>(removeQueue);
-            removeQueue.clear();
-            for(int i = 0, n = removeList.size(); i < n; ++i) {
-                long filePos = removeList.get(i);
-                try {
-                    dataIO.unlink(filePos);
-                } catch (IOException ignored) {}
+
+            int count = 0;
+            int memCacheLimit = getMemCacheSize();
+            for (CSONItem csonItem : itemSet) {
+                if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
+                   try {
+                       unlink(csonItem);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    csonItem.setStoragePos(-1);
+                  }
+                  csonItem.storeIfNeed();
+                  csonItem.setStore(count > memCacheLimit);
+                  ++count;
             }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            writeUnlock();
         }
 
+        return commitResult;
 
     }
 
     @Override
     public boolean isEmpty() {
-        //ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
-        lock.lock();
-        boolean isEmpty = itemSet.isEmpty();
-        lock.unlock();
-        return isEmpty;
+        readLock();
+        try {
+            return itemSet.isEmpty();
+        } finally {
+            readUnlock();
+        }
     }
 
-
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public Set<String> indexKeys() {
-        if(indexKeySet != null) return indexKeySet;
-        TreeSet<String> set = new TreeSet<>();
-        set.add(indexKey);
-        indexKeySet = set;
-        return set;
-    }
-
-
-    private CSONItem getByIndexValue(Object value) {
-        return get(new CSONObject().put(indexKey, value));
-    }
-
-    private CSONItem get(CSONObject jsonObject) {
-        CSONItem item = new CSONItem(storeDelegator,jsonObject,indexKey, indexSort);
-        ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
-        lock.lock();
+    private CSONItem get_(CSONObject csonObject) {
+        String indexKey = getIndexKey();
+        CSONItem item = new CSONItem(getStoreDelegator(),csonObject,indexKey, getSort());
         CSONItem foundItem = itemSet.floor(item);
-        lock.unlock();
-        if(foundItem == null || !CompareUtil.compare(foundItem.getIndexValue(), jsonObject.opt(indexKey), OP.eq)) {
+        if(foundItem == null || !CompareUtil.compare(foundItem.getIndexValue(), csonObject.opt(indexKey), OP.eq)) {
             return null;
         }
         return foundItem;
@@ -226,69 +188,54 @@ public class IndexSet implements IndexCollection{
     }
 
     @Override
-    public boolean addOrReplace(CSONObject jsonObject) {
-        if(jsonObject == null || jsonObject.opt(indexKey) == null) {
+    public boolean addOrReplace(CSONObject csonObject) {
+        if(!checkIndexKey(csonObject)) {
             return false;
         }
-        CSONItem foundItem = get(jsonObject);
-        isChanged = true;
-        if(foundItem == null) {
-            boolean isSuccess = add(jsonObject);
-            return isSuccess;
-        }
-        foundItem.setCsonObject(jsonObject);
+        addOrReplaceTransactionOrder(csonObject);
         return true;
     }
 
     @Override
-    public boolean addOrReplaceAll(CSONArray jsonArray) {
-        boolean isSuccess = true;
-        for(int i = 0, n = jsonArray.size(); i < n; ++i) {
-            CSONObject jsonObject = jsonArray.optObject(i);
-            if(jsonObject == null || jsonObject.opt(indexKey) == null) {
-                return false;
-            }
-        }
-        isChanged = true;
-        for(int i = 0, n = jsonArray.size(); i < n; ++i) {
-            CSONObject jsonObject = jsonArray.getObject(i);
-            isSuccess = isSuccess & addOrReplace(jsonObject);
-        }
-        return isSuccess;
+    public boolean addOrReplaceAll(CSONArray csonArray) {
+        Collection<CSONObject > allList = toCSONObjectListFrom(csonArray);
+        if(allList == null) return false;
+        addOrReplaceAllTransactionOrder(allList);
+        return true;
     }
 
     @Override
-    public boolean add(CSONObject jsonObject) {
-        CSONItem item = new CSONItem(storeDelegator,jsonObject, indexKey, indexSort);
-        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        lock.lock();
-        boolean success = itemSet.add(item);
-        if(this.dataIO == null && itemSet.size() > memCacheLimit) {
-            itemSet.pollLast();
+    public boolean add(CSONObject csonObject) {
+        if(!checkIndexKey(csonObject)) {
+            return false;
         }
-        lock.unlock();
-        isChanged = true;
-        return success;
+        addTransactionOrder(csonObject);
+        return true;
+    }
+
+
+    private Collection<CSONObject> toCSONObjectListFrom(CSONArray csonArray) {
+        ArrayList<CSONObject> allList = new ArrayList<>();
+        for(int i = 0, n = csonArray.size(); i < n; ++i) {
+            CSONObject csonObject = csonArray.optObject(i);
+            if(csonObject == null || csonObject.opt(indexKey) == null) {
+                return null;
+            }
+            allList.add(csonObject);
+        }
+        return allList;
     }
 
     @Override
     public boolean addAll(CSONArray csonArray) {
-        ArrayList<CSONObject> jsonObjects = new ArrayList<>();
-        for(int i = 0, n = csonArray.size(); i < n; ++i) {
-            CSONObject jsonObject = csonArray.optObject(i);
-            if(jsonObject == null) {
-                return false;
-            }
-            jsonObjects.add(jsonObject);
-        }
-        boolean isSuccess = addAll(jsonObjects);
-        isChanged = true;
-        return isSuccess;
+        Collection<CSONObject > allList = toCSONObjectListFrom(csonArray);
+        if(allList == null) return false;
+        addAllTransactionOrder(allList);
+        return true;
     }
 
     @Override
     public List<CSONObject> findByIndex(Object indexValue, FindOption option, int limit) {
-        ReentrantReadWriteLock.ReadLock lock = readWriteLock.readLock();
         OP op = option.getOp();
         if(op == null) op = OP.eq;
         ArrayList<CSONObject> result = new ArrayList<>();
@@ -298,31 +245,31 @@ public class IndexSet implements IndexCollection{
         }
         switch (op) {
             case eq:
-                CSONObject jsonObject = findByIndex(indexValue);
-                if(jsonObject != null) result.add(jsonObject);
+                CSONObject csonObject = findByIndex(indexValue);
+                if(csonObject != null) result.add(csonObject);
                 break;
             case gte:
             case gt:
                 if(indexSort > 0) {
-                    lock.lock();
+                    readLock();
                     result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
-                    lock.unlock();
+                    readUnlock();;
                 } else {
-                    lock.lock();
+                    readLock();
                     result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
-                    lock.unlock();
+                    readUnlock();
                 }
                 break;
             case lte:
             case lt:
                 if(indexSort > 0) {
-                    lock.lock();
+                    readLock();
                     result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
-                    lock.unlock();
+                    readUnlock();
                 } else {
-                    lock.lock();
+                    readLock();
                     result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
-                    lock.unlock();
+                    readUnlock();
                 }
                 break;
         }
@@ -330,50 +277,45 @@ public class IndexSet implements IndexCollection{
     }
 
     @Override
-    public List<Object> removeByIndex(Object indexValue, FindOption option) {
-        ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
+    public void removeByIndex(Object indexValue, FindOption option) {
         OP op = option.getOp();
         if(op == null) op = OP.eq;
         ArrayList<Object> results = new ArrayList<>();
         switch (op) {
             case eq:
-                if(removeIndex(indexValue)) {
-                    results.add(indexValue);
-                }
+                removeTransactionOrder(new CSONObject().put(indexKey, indexValue));
                 break;
             case gte:
             case gt:
                 if(indexSort > 0) {
-                    writeLock.lock();
-                    results = removeByJSONItems(itemSet.tailSet(makeIndexItem(indexValue), op == OP.gte));
-                    writeLock.unlock();
+                    writeLock();
+                    removeByJSONItems(itemSet.tailSet(makeIndexItem(indexValue), op == OP.gte));
+                    writeUnlock();
                 } else {
-                    writeLock.lock();
-                    results = removeByJSONItems(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte));
-                    writeLock.unlock();
+                    writeLock();
+                    removeByJSONItems(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte));
+                    writeUnlock();
                 }
                 break;
             case lte:
             case lt:
                 if(indexSort > 0) {
-                    writeLock.lock();
-                    results = removeByJSONItems(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte));
-                    writeLock.unlock();
+                    writeLock();
+                    removeByJSONItems(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte));
+                    writeUnlock();
                 } else {
-                    writeLock.lock();
-                    results = removeByJSONItems(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte));
-                    writeLock.unlock();
+                    writeLock();
+                    removeByJSONItems(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte));
+                    writeUnlock();
                 }
                 break;
         }
-        return results;
     }
 
     @Override
     public List<CSONObject> list(int limit, boolean reverse) {
-        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
         try {
-            readLock.lock();
+            readLock();
             if (reverse) {
                 List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet(), limit);
                 return result;
@@ -381,35 +323,32 @@ public class IndexSet implements IndexCollection{
             List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet, limit);
             return result;
         } finally {
-            readLock.unlock();
+            readUnlock();
         }
 
     }
 
     private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<CSONItem> CSONItems, int limit) {
         int count = 0;
-        ArrayList<CSONObject> jsonObjects = new ArrayList<>();
+        ArrayList<CSONObject> csonObjects = new ArrayList<>();
         for(CSONItem item : CSONItems) {
             if(count >= limit) {
                 break;
             }
-            jsonObjects.add(item.getCsonObject());
+            csonObjects.add(item.getCsonObject());
             ++count;
         }
-        return jsonObjects;
+        return csonObjects;
     }
 
 
-    private ArrayList<Object> removeByJSONItems(Collection<CSONItem> CSONItems) {
+    private void removeByJSONItems(Collection<CSONItem> CSONItems) {
         ArrayList<Object> removedIndexList = new ArrayList<>();
         for(CSONItem item : CSONItems) {
             removedIndexList.add(item.getIndexValue());
-            addPosInRemoveList(item);
         }
-        CSONItems.clear();
-        return removedIndexList;
+        removeTransactionOrder(CSONItems);
     }
-
 
 
     private CSONItem makeIndexItem(Object index) {
@@ -419,66 +358,36 @@ public class IndexSet implements IndexCollection{
     }
 
     private CSONObject findByIndex(Object indexValue) {
-        CSONItem foundItem = get(new CSONObject().put(indexKey, indexValue));
+        readLock();
+        CSONItem foundItem = get_(new CSONObject().put(indexKey, indexValue));
+        readUnlock();
         return foundItem == null ? null : foundItem.getCsonObject();
     }
 
-    private boolean removeIndex(Object indexValue) {
-        CSONItem indexItem = getByIndexValue(indexValue); //makeIndexItem(indexValue);
-        if(indexItem == null) return false;
-        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        lock.lock();
-        boolean isSuccess = itemSet.remove(indexItem);
-        addPosInRemoveList(indexItem);
-        lock.unlock();;
-        return isSuccess;
-    }
 
     public CSONObject last() {
-        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
         try {
-            readLock.lock();
+            readLock();
             if (itemSet.isEmpty()) return null;
-            return itemSet.last().getCsonObject();
+            CSONItem item = itemSet.last();
+            CSONObject csonObject = item.getCsonObject();
+            return csonObject;
         } finally {
-            readLock.unlock();
+            readUnlock();
         }
     }
 
     @Override
     public boolean remove(CSONObject o) {
-        CSONItem item = get(o); //new CSONItem(storeDelegator,(CSONObject) o, indexKey, indexSort);
+        readLock();
+        CSONItem item = get_(o); //new CSONItem(storeDelegator,(CSONObject) o, indexKey, indexSort);
+        readUnlock();
         if(item == null) return false;
-        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        lock.lock();
-        boolean isSuccess = itemSet.remove(item);
-        addPosInRemoveList(item);
-        lock.unlock();
-        return isSuccess;
-    }
-
-    private void addPosInRemoveList(CSONItem item) {
-        long pos = item.getStoragePos();
-        if(pos > 0) {
-            removeQueue.add(pos);
-        }
+        removeTransactionOrder(o);
+        return true;
     }
 
 
-    private boolean addAll(Collection<? extends CSONObject> c) {
-        Collection<?> list = objectCollectionToJSONItemCollection(c);
-        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
-        lock.lock();
-        boolean success = itemSet.addAll((Collection<? extends CSONItem>) list);
-        if(success && this.dataIO == null) {
-            while(itemSet.size() > memCacheLimit) {
-                itemSet.pollLast();
-            }
-        }
-        lock.unlock();
-        return success;
-
-    }
 
 
     private Collection<?> objectCollectionToJSONItemCollection(Collection<?> c) {
@@ -495,61 +404,64 @@ public class IndexSet implements IndexCollection{
 
 
     public void clear() {
-        ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-        lock.lock();
-        for(CSONItem item : itemSet) {
-            addPosInRemoveList(item);
-        }
-        itemSet.clear();
-        lock.unlock();
+        clearTransactionOrder();
     }
 
     @Override
     public Iterator<CSONObject> iterator() {
-        ReentrantReadWriteLock.ReadLock lock = readWriteLock.readLock();
-        lock.lock();
-        final Iterator<CSONItem> iterator = itemSet.iterator();
-        lock.unlock();
+        readLock();
+        Iterator<CSONItem> iterator = null;
+        try {
+            iterator = itemSet.iterator();
+        } finally {
+            readUnlock();
+        }
+        Iterator<CSONItem> finalIterator = iterator;
 
         return new Iterator<CSONObject>() {
             CSONItem current;
             @Override
             public boolean hasNext() {
-                ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
-                lock.lock();
+                readLock();
                 try {
-                    boolean hasNext = iterator.hasNext();
+                    boolean hasNext = finalIterator.hasNext();
                     return hasNext;
                 } finally {
-                    lock.unlock();
+                    readUnlock();
                 }
             }
 
             @Override
             public CSONObject next() {
-                ReentrantReadWriteLock.ReadLock lock =  readWriteLock.readLock();
-                lock.lock();
+                readLock();
                 try {
-                    current = iterator.next();
+                    current = finalIterator.next();
                     if(current == null) return null;
                     return current.getCsonObject();
-                } finally {
-                    lock.unlock();
+                }
+                catch (NoSuchElementException e) {
+                    throw new NoSuchElementException();
+                }
+                finally {
+                    readUnlock();
                 }
 
             }
 
             @Override
             public void remove() {
-                ReentrantReadWriteLock.WriteLock lock =  readWriteLock.writeLock();
-                lock.lock();
+                writeLock();
                 try {
-                    iterator.remove();
-                    if(current != null) {
-                        addPosInRemoveList(current);
+                    finalIterator.remove();
+                    if (current != null) {
+                        unlink(current);
                     }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (IllegalStateException ea) {
+                    throw new IllegalStateException();
                 } finally {
-                    lock.unlock();
+                    writeLock();
                 }
 
             }

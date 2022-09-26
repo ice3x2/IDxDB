@@ -221,7 +221,7 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 	
 	public Integer optInteger(int index, int def) {
 		try {
-			return DataConverter.toInteger(mList.get(index));
+			return DataConverter.toInteger(mList.get(index), def);
 		} catch (IndexOutOfBoundsException e) {
 			return def;
 		}
@@ -241,7 +241,7 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 	
 	public short optShort(int index, short def) {
 		try {			
-			return DataConverter.toShort(mList.get(index));
+			return DataConverter.toShort(mList.get(index),def);
 		} catch (IndexOutOfBoundsException e) {
 			return def;
 		}
@@ -311,7 +311,7 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 	
 	public boolean optBoolean(int index, boolean def) {
 		try {			
-			return DataConverter.toBoolean(mList.get(index));
+			return DataConverter.toBoolean(mList.get(index), def);
 		} catch (IndexOutOfBoundsException e) {
 			return def;
 		}
