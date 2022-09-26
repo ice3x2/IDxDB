@@ -37,9 +37,7 @@ public class CollectionOption {
         return option.getString("className");
     }
 
-    public void setFileStore(boolean fileStoreEnable) {
-        option.put("fileStore", fileStoreEnable);
-    }
+
 
     public void setOption(String key, Object value) {
         this.option.put(key, value);
@@ -49,9 +47,7 @@ public class CollectionOption {
         return this.option.get(key);
     }
 
-    public boolean isFileStore() {
-        return option.optBoolean("fileStore", true);
-    }
+
 
     public CSONObject toCsonObject() {
         return this.option;

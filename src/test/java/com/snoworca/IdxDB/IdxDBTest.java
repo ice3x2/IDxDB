@@ -1,6 +1,7 @@
 package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
+import com.snoworca.IdxDB.collection.IndexCollection;
 import com.snoworca.IdxDB.collection.IndexSet;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
@@ -76,11 +77,17 @@ class IdxDBTest {
 
 
         for(int k = 0; k < collectionSize; ++k) {
-            IndexSet indexSet = idxDB.newIndexSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
-            for(int i = 0; i < rowSize; ++i) {
-                indexSet.add(new CSONObject().put("date", i).put("str", i + ""));
+            IndexCollection indexCollection;
+            if(k == 5) {
+                indexCollection = idxDB.newIndexMapBuilder(k +"").memCacheSize(memCacheSize).index("date" , 1).create();
+            } else {
+                indexCollection = idxDB.newIndexSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
             }
-            indexSet.commit();
+
+            for(int i = 0; i < rowSize; ++i) {
+                indexCollection.add(new CSONObject().put("date", i).put("str", i + ""));
+            }
+            indexCollection.commit();
             if(k % 10 == 0 && k != 0) {
                 System.out.println(k + ",");
             } else {
@@ -145,6 +152,10 @@ class IdxDBTest {
 
 
         assertEquals(null, idxDB.get("19"));
+
+
+        IndexCollection indexCollection = idxDB.get("5");
+        indexCollection.findByIndex(5, FindOption.)
 
 
 

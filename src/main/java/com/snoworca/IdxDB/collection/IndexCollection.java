@@ -23,7 +23,9 @@ public interface IndexCollection extends Iterable<CSONObject> {
      * public List<CSONObject> find(FindFilter findFilter,int limit);
      */
 
-    public List<CSONObject> findByIndex(Object start,FindOption options,int limit);
+    public List<CSONObject> findByIndex(Object index,FindOption options,int limit);
+
+    public CSONObject findOneByIndex(Object index);
 
     public void removeByIndex(Object start, FindOption options);
 

@@ -1,7 +1,9 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.dataStore.DataBlock;
 import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
@@ -18,7 +20,6 @@ abstract class IndexCollectionBase implements IndexCollection {
     private final int memCacheLimit;
     private DataIO dataIO;
     private String name;
-    private boolean isFileStore;
     private LinkedHashSet<String> indexKeySet;
     private int memCacheSize;
     private long lastDataStorePos = -1;
@@ -33,7 +34,6 @@ abstract class IndexCollectionBase implements IndexCollection {
     IndexCollectionBase(DataIO dataIO, CollectionOption collectionOption) {
         this.dataIO = dataIO;
         this.name = collectionOption.getName();
-        this.isFileStore = collectionOption.isFileStore();
         this.memCacheSize = 0;
         this.indexKey = collectionOption.getIndexKey();
         this.sort = collectionOption.getIndexSort();
@@ -45,6 +45,77 @@ abstract class IndexCollectionBase implements IndexCollection {
         }
         initData();
         this.collectionOption = collectionOption;
+    }
+
+
+    private Collection<CSONObject> toCSONObjectListFrom(CSONArray csonArray) {
+        ArrayList<CSONObject> allList = new ArrayList<>();
+        for(int i = 0, n = csonArray.size(); i < n; ++i) {
+            CSONObject csonObject = csonArray.optObject(i);
+            if(csonObject == null || csonObject.opt(indexKey) == null) {
+                return null;
+            }
+            allList.add(csonObject);
+        }
+        return allList;
+    }
+
+    @Override
+    public CSONObject findOneByIndex(Object index) {
+        List<CSONObject> result = findByIndex(index, FindOption.fromOP(OP.eq), 1);
+        if(result.isEmpty()) return null;
+        return result.get(0);
+    }
+
+    @Override
+    public boolean addOrReplaceAll(CSONArray csonArray) {
+        Collection<CSONObject > allList = toCSONObjectListFrom(csonArray);
+        if(allList == null) return false;
+        addOrReplaceAllTransactionOrder(allList);
+        return true;
+    }
+
+    @Override
+    public boolean addOrReplace(CSONObject csonObject) {
+        if(!checkIndexKey(csonObject)) {
+            return false;
+        }
+        addOrReplaceTransactionOrder(csonObject);
+        return true;
+    }
+
+    @Override
+    public boolean remove(CSONObject o) {
+        if(!checkIndexKey(o)) {
+            return false;
+        }
+        removeTransactionOrder(o);
+        return true;
+    }
+
+
+    @Override
+    public void clear() {
+        clearTransactionOrder();
+    }
+
+
+    @Override
+    public boolean add(CSONObject csonObject) {
+        if(!checkIndexKey(csonObject)) {
+            return false;
+        }
+        addTransactionOrder(csonObject);
+        return true;
+    }
+
+
+    @Override
+    public boolean addAll(CSONArray csonArray) {
+        Collection<CSONObject > allList = toCSONObjectListFrom(csonArray);
+        if(allList == null) return false;
+        addAllTransactionOrder(allList);
+        return true;
     }
 
     protected abstract void onInit();

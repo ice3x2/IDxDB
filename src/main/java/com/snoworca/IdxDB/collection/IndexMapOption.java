@@ -15,13 +15,7 @@ public class IndexMapOption extends CollectionOption {
         }
         return option;
     }
-    public void setMemCacheSize(int size) {
-        toCsonObject().put("memCacheSize", size);
-    }
 
-    public int getMemCacheSize() {
-        return toCsonObject().optInteger("memCacheSize", 100);
-    }
 
     public void setAccessOrder(boolean enable) {
             toCsonObject().put("accessOrder", enable);

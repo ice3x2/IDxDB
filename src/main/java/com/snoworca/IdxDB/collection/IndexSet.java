@@ -187,52 +187,7 @@ public class IndexSet extends IndexCollectionBase {
 
     }
 
-    @Override
-    public boolean addOrReplace(CSONObject csonObject) {
-        if(!checkIndexKey(csonObject)) {
-            return false;
-        }
-        addOrReplaceTransactionOrder(csonObject);
-        return true;
-    }
 
-    @Override
-    public boolean addOrReplaceAll(CSONArray csonArray) {
-        Collection<CSONObject > allList = toCSONObjectListFrom(csonArray);
-        if(allList == null) return false;
-        addOrReplaceAllTransactionOrder(allList);
-        return true;
-    }
-
-    @Override
-    public boolean add(CSONObject csonObject) {
-        if(!checkIndexKey(csonObject)) {
-            return false;
-        }
-        addTransactionOrder(csonObject);
-        return true;
-    }
-
-
-    private Collection<CSONObject> toCSONObjectListFrom(CSONArray csonArray) {
-        ArrayList<CSONObject> allList = new ArrayList<>();
-        for(int i = 0, n = csonArray.size(); i < n; ++i) {
-            CSONObject csonObject = csonArray.optObject(i);
-            if(csonObject == null || csonObject.opt(indexKey) == null) {
-                return null;
-            }
-            allList.add(csonObject);
-        }
-        return allList;
-    }
-
-    @Override
-    public boolean addAll(CSONArray csonArray) {
-        Collection<CSONObject > allList = toCSONObjectListFrom(csonArray);
-        if(allList == null) return false;
-        addAllTransactionOrder(allList);
-        return true;
-    }
 
     @Override
     public List<CSONObject> findByIndex(Object indexValue, FindOption option, int limit) {
@@ -377,16 +332,6 @@ public class IndexSet extends IndexCollectionBase {
         }
     }
 
-    @Override
-    public boolean remove(CSONObject o) {
-        readLock();
-        CSONItem item = get_(o); //new CSONItem(storeDelegator,(CSONObject) o, indexKey, indexSort);
-        readUnlock();
-        if(item == null) return false;
-        removeTransactionOrder(o);
-        return true;
-    }
-
 
 
 
@@ -402,10 +347,6 @@ public class IndexSet extends IndexCollectionBase {
         return list;
     }
 
-
-    public void clear() {
-        clearTransactionOrder();
-    }
 
     @Override
     public Iterator<CSONObject> iterator() {

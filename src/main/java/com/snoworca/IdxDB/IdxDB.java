@@ -82,6 +82,9 @@ public class IdxDB {
                 if(IndexSet.class.getName().equals(csonObject.getString("className"))) {
                     IndexSet indexSet = new IndexSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
                     db.indexCollectionMap.put(indexSet.getName(), indexSet);
+                } else if(IndexMap.class.getName().equals(csonObject.getString("className"))) {
+                    IndexMap indexMap = new IndexMap(db.dataIO, IndexMapOption.fromCSONObject(csonObject));
+                    db.indexCollectionMap.put(indexMap.getName(), indexMap);
                 }
             }
 
@@ -135,9 +138,8 @@ public class IdxDB {
 
 
 
-
-    public IndexSetBuilder newIndexSetBuilder(String name) {
-        CollectionCreateCallback callback = new CollectionCreateCallback() {
+    private CollectionCreateCallback makeCollectionCreateCallback(String name) {
+        return new CollectionCreateCallback() {
             @Override
             public void onCreate(IndexCollection indexCollection) {
                 String name = indexCollection.getName();
@@ -160,8 +162,18 @@ public class IdxDB {
                 }
             }
         };
+    };
 
-        return new IndexSetBuilder(callback, dataIO,name, collectionMutableLock);
+    public IndexMapBuilder newIndexMapBuilder(String name) {
+        return new IndexMapBuilder(makeCollectionCreateCallback(name), dataIO,name, collectionMutableLock);
+    }
+
+
+
+    public IndexSetBuilder newIndexSetBuilder(String name) {
+
+
+        return new IndexSetBuilder(makeCollectionCreateCallback(name), dataIO,name, collectionMutableLock);
     }
 
 
