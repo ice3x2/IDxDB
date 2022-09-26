@@ -13,6 +13,17 @@ public class CollectionOption {
         option.put("name", collectionName);
     }
 
+
+    public void setIndex(String key, int sort) {
+        CSONObject csonObject = toCsonObject();
+        csonObject.put("indexKey" , key);
+        csonObject.put("sort" , sort);
+    }
+
+    public String getIndexKey() {
+        return toCsonObject().optString("indexKey");
+    }
+
     public String getName() {
         return option.getString("name");
     }

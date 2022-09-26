@@ -2,14 +2,14 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.cson.CSONObject;
 
-public class IndexSetOption extends CollectionOption {
+public class IndexMapOption extends CollectionOption {
 
-    public IndexSetOption(String collectionName) {
+    public IndexMapOption(String collectionName) {
         super(IndexSet.class.getName(), collectionName);
     }
 
-    public static IndexSetOption fromCSONObject(CSONObject csonObject) {
-        IndexSetOption option = new IndexSetOption(csonObject.getString("name"));
+    public static IndexMapOption fromCSONObject(CSONObject csonObject) {
+        IndexMapOption option = new IndexMapOption(csonObject.getString("name"));
         for(String key : csonObject.keySet()) {
             option.setOption(key, csonObject.get(key));
         }
@@ -22,6 +22,16 @@ public class IndexSetOption extends CollectionOption {
     public int getMemCacheSize() {
         return toCsonObject().optInteger("memCacheSize", 100);
     }
+
+    public void setAccessOrder(boolean enable) {
+            toCsonObject().put("accessOrder", enable);
+    }
+
+    public boolean isAccessOrder() {
+        return toCsonObject().optBoolean("accessOrder", false);
+    }
+
+
 
     public int getIndexSort() {
         return toCsonObject().optInteger("sort");

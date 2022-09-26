@@ -5,32 +5,31 @@ import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class IndexMap extends IndexCollectionBase {
 
 
-    private LinkedHashMap<Object, CSONItem> itemHashMap = new LinkedHashMap<>();
+    private LinkedHashMap<Object, CSONItem> itemHashMap_ = new LinkedHashMap<>();
+    private ArrayList<TransactionOrder> transactionTempList = new ArrayList<>();
+
+    private ReentrantReadWriteLock transactionTempReadWriteLock = new ReentrantReadWriteLock();
     private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     private String indexKey = "";
 
     private volatile boolean isChanged = false;
 
+    private static final float DEFAULT_LOAD_FACTOR = 0.75f;
+    private static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
 
-    IndexMap(DataIO dataIO, CollectionOption collectionOption) {
+    IndexMap(DataIO dataIO, IndexMapOption collectionOption) {
         super(dataIO, collectionOption);
         //TODO LinkedHashMap 의 마지막 인자인 accessOrder 를 받게한다.
 
-        new LinkedHashMap<>()
+        itemHashMap_ = new LinkedHashMap<>(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, collectionOption.isAccessOrder());
 
     }
 
-
-    @Override
-    public Set<String> indexKeys() {
-        return null;
-    }
 
     @Override
     public boolean add(CSONObject csonObject) {
@@ -38,28 +37,26 @@ public class IndexMap extends IndexCollectionBase {
         if(indexValue == null) {
             return false;
         }
-        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
+        ReentrantReadWriteLock.WriteLock lock = transactionTempReadWriteLock.writeLock();
         lock.lock();
-        itemHashMap.put(indexValue, new CSONItem(getStoreDelegator(), csonObject, indexKey, indexValue));
-        isChanged = true;
+        transactionTempList.add(new TransactionOrder(TransactionOrder.ORDER_ADD,  new CSONItem(getStoreDelegator(), csonObject, indexKey, indexValue)));
         lock.unlock();
         return true;
     }
 
     @Override
     public boolean addAll(CSONArray csonArray) {
-        LinkedHashMap<Object, CSONItem> cacheMap = new LinkedHashMap<>();
+        ArrayList<TransactionOrder> cacheList = new ArrayList<>();
         for(int i = 0, n = csonArray.size();i < n; ++i) {
             CSONObject csonObject = csonArray.optObject(i);
             if(csonObject == null) return false;
             Object indexValue = csonObject.opt(indexKey);
             if(indexValue == null) return false;
-            cacheMap.put(indexValue, new CSONItem(getStoreDelegator(), csonObject, indexKey, indexValue));
+            cacheList.add(new TransactionOrder(TransactionOrder.ORDER_ADD, new CSONItem(getStoreDelegator(), csonObject, indexKey, indexValue)));
         }
-        ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
+        ReentrantReadWriteLock.WriteLock lock = transactionTempReadWriteLock.writeLock();
         lock.lock();
-        itemHashMap.putAll(cacheMap);
-        isChanged = true;
+        transactionTempList.addAll(cacheList);
         lock.unlock();
         return true;
     }
@@ -70,46 +67,24 @@ public class IndexMap extends IndexCollectionBase {
         if(indexValue == null) {
             return false;
         }
-        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
-        readLock.lock();
-        CSONItem item = itemHashMap.get(indexValue);
-        readLock.unlock();
-        if(item != null) {
-            item.setCsonObject(csonObject);
-        } else {
-            ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
-            writeLock.lock();
-            itemHashMap.put(indexValue, new CSONItem(getStoreDelegator(),csonObject, indexKey, indexValue));
-            writeLock.unlock();
-        }
+        ReentrantReadWriteLock.WriteLock writeLock = transactionTempReadWriteLock.writeLock();
+        writeLock.lock();
+        transactionTempList.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, new CSONItem(getStoreDelegator(),csonObject, indexKey, indexValue)));
+        writeLock.unlock();
         return true;
     }
 
     @Override
     public boolean addOrReplaceAll(CSONArray csonArray) {
-        ArrayList<CSONItem> cacheList = new ArrayList<>();
+        ArrayList<TransactionOrder> cacheList = new ArrayList<>();
         for(int i = 0, n = csonArray.size();i < n; ++i) {
             CSONObject csonObject = csonArray.optObject(i);
             if(csonObject == null) return false;
             Object indexValue = csonObject.opt(indexKey);
             if(indexValue == null) return false;
-            cacheList.add(new CSONItem(getStoreDelegator(), csonObject, indexKey, indexValue));
+            cacheList.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE,new CSONItem(getStoreDelegator(), csonObject, indexKey, indexValue)));
         }
-        for(int i = 0, n = cacheList.size(); i < n; ++i) {
-            CSONItem csonItem = cacheList.get(i);
-            ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
-            readLock.lock();
-            CSONItem item = itemHashMap.get(csonItem.getIndexValue());
-            readLock.unlock();
-            if(item != null) {
-                item.setCsonObject(csonItem.getCsonObject());
-            } else {
-                ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
-                writeLock.lock();
-                itemHashMap.put(csonItem.getIndexValue(), csonItem);
-                writeLock.unlock();
-            }
-        }
+
         return true;
     }
 
@@ -130,13 +105,14 @@ public class IndexMap extends IndexCollectionBase {
 
     @Override
     public int size() {
-        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
+        /*ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
         readLock.lock();
         try {
             return itemHashMap.size();
         } finally {
             readLock.unlock();
-        }
+        }*/
+        return 0;
     }
 
     @Override
@@ -146,13 +122,14 @@ public class IndexMap extends IndexCollectionBase {
 
     @Override
     public boolean isEmpty() {
-        ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
+        /*ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
         readLock.lock();
         try {
             return itemHashMap.isEmpty();
         } finally {
             readLock.unlock();
-        }
+        }*/
+        return false;
     }
 
     @Override
