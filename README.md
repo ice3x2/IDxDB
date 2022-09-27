@@ -20,11 +20,16 @@
     IdxDB idxDB = IdxDB.newMaker(file).make();
     ```
 
-   * 컬렉션 생성
+   * 인덱스셋 생성
      ```java
-     IndexSet set = 
-     idxDB.newIndexSetBuilder("D_DATA")
-     .index("dateL", 1)
+     IndexCollection set = 
+     // 이름을 D005930으로 설정한다.
+     idxDB.newIndexSetBuilder("D005930")
+     // 인덱스 키를 설정하고 오름차순 정렬
+     .index("date", 1)
+     // 상위 1000개의 로우를 메모리에 캐시한다
      .memCacheSize(1000)
+     // 생성
      .create();
       ```
+      * 인덱스셋은 자바의 TreeSet을 이용함. 중복되는 인덱스를 가질수 없다. 
