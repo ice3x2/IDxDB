@@ -12,4 +12,19 @@
   * 자바의 TreeSet과 LinkedHashMap을 사용하여 인덱싱.
   * 아직 인덱스외의 값을 이용한 검색을 지원하지않음.
   * json형식의 간단한 쿼리를 지원. 하지만 서버와 인증은 지원하지 않음.
-  
+## 사용법
+  * DB생성
+
+    ```java
+    File file = new File("yes.db");
+    IdxDB idxDB = IdxDB.newMaker(file).make();
+    ```
+
+   * 컬렉션 생성
+     ```java
+     IndexSet set = 
+     idxDB.newIndexSetBuilder("D_DATA")
+     .index("dateL", 1)
+     .memCacheSize(1000)
+     .create();
+      ```
