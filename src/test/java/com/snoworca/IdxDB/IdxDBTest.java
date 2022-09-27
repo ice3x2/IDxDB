@@ -2,6 +2,7 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
+import com.snoworca.IdxDB.collection.IndexMap;
 import com.snoworca.IdxDB.collection.IndexSet;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
@@ -79,7 +80,9 @@ class IdxDBTest {
         for(int k = 0; k < collectionSize; ++k) {
             IndexCollection indexCollection;
             if(k == 5) {
-                indexCollection = idxDB.newIndexMapBuilder(k +"").memCacheSize(memCacheSize).index("date" , 1).create();
+                indexCollection = idxDB.newIndexMapBuilder(k + "").memCacheSize(memCacheSize).index("date", 1).create();
+            } else if(k == 6) {
+                indexCollection = idxDB.newIndexMapBuilder(k +"").memCacheSize(memCacheSize).setAccessOrder(true).index("date" , -1).create();
             } else {
                 indexCollection = idxDB.newIndexSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
             }
@@ -154,9 +157,39 @@ class IdxDBTest {
         assertEquals(null, idxDB.get("19"));
 
 
-        IndexCollection indexCollection = idxDB.get("5");
-        indexCollection.findByIndex(5, FindOption.)
+        //indexCollection.findByIndex(5, FindOption)
 
+        IndexMap indexMap = (IndexMap)idxDB.get("5");
+        CSONObject result = indexMap.findOneByIndex(1);
+        assertEquals(result.optString("str"), "1");
+
+
+        start = System.currentTimeMillis();
+        List<CSONObject>  list = indexMap.list(1000, false);
+        System.out.println((System.currentTimeMillis() - start) + "ms");
+
+        start = System.currentTimeMillis();
+        list = indexMap.list(1000, true);
+        System.out.println((System.currentTimeMillis() - start) + "ms");
+
+
+        indexMap = (IndexMap)idxDB.get("6");
+        result = indexMap.findOneByIndex(5000);
+        assertEquals(result.optString("str"), "5000");
+        result = indexMap.findOneByIndex(4000);
+        result = indexMap.findOneByIndex(3000);
+        result = indexMap.findOneByIndex(2000);
+        indexMap.commit();
+
+
+        start = System.currentTimeMillis();
+        list = indexMap.list(1000, false);
+        assertTrue((System.currentTimeMillis() - start) < 2);
+        assertEquals("2000",list.get(0).get("str"));
+        assertEquals("3000",list.get(1).get("str"));
+        assertEquals("4000",list.get(2).get("str"));
+        assertEquals("5000",list.get(3).get("str"));
+        System.out.println((System.currentTimeMillis() - start) + "ms");
 
 
 

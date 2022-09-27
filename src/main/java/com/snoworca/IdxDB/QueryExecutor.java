@@ -2,6 +2,7 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
+import com.snoworca.IdxDB.collection.IndexMapBuilder;
 import com.snoworca.IdxDB.collection.IndexSetBuilder;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
@@ -25,10 +26,10 @@ public class QueryExecutor {
             return makeErrorCSONObject("No object of 'argument' in query method '" + method + "'.");
         }
         try {
-            if ("newIndexSet".equalsIgnoreCase(method)) {
-                return executeNewIndexSetMethod(idxDB, argument);
+            if ("newIndexSet".equalsIgnoreCase(method) || "newIndexMap".equalsIgnoreCase(method)) {
+                return executeNewCollectionMethod(idxDB,method, argument);
             }
-            if ("dropCollection".equalsIgnoreCase(method)) {
+            else if ("dropCollection".equalsIgnoreCase(method)) {
                 return executeDropCollectionMethod(idxDB, argument);
             } else if ("add".equalsIgnoreCase(method)) {
                 return executeAddMethod(idxDB, argument);
@@ -54,7 +55,7 @@ public class QueryExecutor {
     }
 
 
-    public static  CSONObject executeNewIndexSetMethod(IdxDB store, CSONObject argument) {
+    public static  CSONObject executeNewCollectionMethod(IdxDB store,String method, CSONObject argument) {
         String name = argument.optString("name");
         CSONObject index = argument.optObject("index");
         if(name == null || name.isEmpty()) {
@@ -66,15 +67,24 @@ public class QueryExecutor {
         if(store.get(name) != null) {
             return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
         }
-        IndexSetBuilder indexSetBuilder = store.newIndexSetBuilder(name);
         String firstIndexKey = index.keySet().iterator().next();
         int sortMethod = index.optInteger(firstIndexKey, 1);
         int memCacheSize = index.optInteger("memCacheSize", 1000);
         boolean isFileStore = index.optBoolean("fileStore", true);
-        indexSetBuilder.index(firstIndexKey, sortMethod);
-        indexSetBuilder.memCacheSize(memCacheSize);
-        indexSetBuilder.setFileStore(isFileStore);
-        indexSetBuilder.create();
+        boolean accessOrder = index.optBoolean("accessOrder", false);
+        if("newIndexSet".equalsIgnoreCase(method)) {
+            IndexSetBuilder indexSetBuilder = store.newIndexSetBuilder(name);
+            indexSetBuilder.index(firstIndexKey, sortMethod);
+            indexSetBuilder.memCacheSize(memCacheSize);
+            indexSetBuilder.setFileStore(isFileStore);
+            indexSetBuilder.create();
+        } else if("newIndexMap".equalsIgnoreCase(method)) {
+            IndexMapBuilder indexMapBuilder = store.newIndexMapBuilder(name);
+            indexMapBuilder.index(firstIndexKey, sortMethod);
+            indexMapBuilder.memCacheSize(memCacheSize);
+            indexMapBuilder.setAccessOrder(accessOrder);
+            indexMapBuilder.create();
+        }
         return new CSONObject().put("isError", false).put("success", true).put("message", "ok");
     }
 

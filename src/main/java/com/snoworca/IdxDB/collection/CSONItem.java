@@ -98,13 +98,13 @@ class CSONItem implements Comparable<CSONItem> {
         if(enable) {
             if(this.csonObject != null && (!isStorageSaved || isChanged)) {
                 storagePos = storeDelegator.cache(csonObject.toByteArray());
+                isStorageSaved = true;
             }
             this.csonObject = null;
         }
         else if(this.csonObject == null) {
             this.csonObject = getCsonObject();
         }
-        isStorageSaved = enable;
     }
 
     protected void setStoragePos(long pos) {

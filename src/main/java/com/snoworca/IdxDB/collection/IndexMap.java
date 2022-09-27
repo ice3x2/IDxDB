@@ -15,30 +15,51 @@ public class IndexMap extends IndexCollectionBase {
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
     private static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
 
+    private boolean isAccessOrder;
+    private boolean isChangeOrder = false;
 
     public IndexMap(DataIO dataIO, IndexMapOption collectionOption) {
         super(dataIO, collectionOption);
-        //TODO LinkedHashMap 의 마지막 인자인 accessOrder 를 받게한다.
-
-        itemHashMap = new LinkedHashMap<>(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, collectionOption.isAccessOrder());
 
     }
 
     @Override
-    protected void onInit() {
-        itemHashMap = new LinkedHashMap<>();
+    protected void onInit(CollectionOption collectionOption) {
+        isAccessOrder = ((IndexMapOption)collectionOption).isAccessOrder();
+        itemHashMap = new LinkedHashMap<>(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, isAccessOrder);
+
     }
 
     @Override
     protected void onRestoreCSONItem(CSONItem csonItem) {
+
         itemHashMap.put(csonItem.getIndexValue(), csonItem);
     }
 
     @Override
-    protected Iterator<CSONItem> getCSONItemIterator() {
-        return itemHashMap.values().iterator();
+    protected void onMemStore() {
+        int memCacheLimit = getMemCacheSize();
+        int count = 0, descCacheBegin = itemHashMap.size() - memCacheLimit;
+        boolean asc = getSort() > -1;
+        Collection<CSONItem> values = itemHashMap.values();
+        for (CSONItem csonItem : values) {
+            if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
+                try {
+                    unlink(csonItem);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                csonItem.setStoragePos(-1);
+            }
+            csonItem.storeIfNeed();
+            if(asc) {
+                csonItem.setStore(count > memCacheLimit);
+            } else {
+                csonItem.setStore(count < descCacheBegin);
+            }
+            ++count;
+        }
     }
-
 
     @Override
     public List<CSONObject> findByIndex(Object indexValue, FindOption option, int limit) {
@@ -54,6 +75,7 @@ public class IndexMap extends IndexCollectionBase {
                 case eq:
                     CSONItem csonItem = itemHashMap.get(indexValue);
                     if (csonItem != null) result.add(csonItem.getCsonObject());
+                    isChangeOrder = isAccessOrder;
                     break;
             }
         } finally {
@@ -86,6 +108,8 @@ public class IndexMap extends IndexCollectionBase {
         try {
             readLock();
             if ((reverse && asc) || (!reverse && !asc) ) {
+
+
                 ArrayList<CSONItem> arrayList = new ArrayList<>(itemHashMap.values());
                 Collections.reverse(arrayList);
                 List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(arrayList, limit);
@@ -142,75 +166,64 @@ public class IndexMap extends IndexCollectionBase {
         writeLock();
         CommitResult commitResult = new CommitResult();
         try {
-            if(transactionOrders.isEmpty()) {
+            if(!transactionOrders.isEmpty()) {
+                for (int i = 0, n = transactionOrders.size(); i < n; ++i) {
+                    TransactionOrder transactionOrder = transactionOrders.get(i);
+                    CSONItem item = transactionOrder.getItem();
+                    switch (transactionOrder.getOrder()) {
+                        case TransactionOrder.ORDER_REMOVE:
+                            Object indexValueOfRemove = item.getIndexValue();
+                            if ((item = itemHashMap.remove(indexValueOfRemove)) != null) {
+                                commitResult.incrementCountOfRemove();
+                                unlink(item);
+                                item.release();
+                            }
+                            break;
+                        case TransactionOrder.ORDER_CLEAR:
+                            for (CSONItem clearItem : itemHashMap.values()) {
+                                unlink(clearItem);
+                                clearItem.release();
+                                commitResult.incrementCountOfRemove();
+                            }
+                            itemHashMap.clear();
+                            break;
+                        case TransactionOrder.ORDER_ADD:
+                        case TransactionOrder.ORDER_ADD_OR_REPLACE:
+                            CSONObject addOrReplaceCsonObject = item.getCsonObject();
+                            Object indexValueForAddOrReplace = item.getIndexValue();
+                            CSONItem foundItemOfAddOrReplace = itemHashMap.get(indexValueForAddOrReplace);
+                            if (foundItemOfAddOrReplace == null) {
+                                itemHashMap.put(indexValueForAddOrReplace, item);
+                                item.storeIfNeed();
+                                commitResult.incrementCountOfAdd();
+                            } else {
+                                unlink(foundItemOfAddOrReplace);
+                                foundItemOfAddOrReplace.setStoragePos(-1);
+                                foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
+                                foundItemOfAddOrReplace.storeIfNeed();
+                                commitResult.incrementCountOfReplace();
+                            }
+                            break;
+                        case TransactionOrder.ORDER_REPLACE:
+                            CSONObject replaceCsonObject = item.getCsonObject();
+                            Object indexValueForReplace = item.getIndexValue();
+                            CSONItem foundItemOfReplace = itemHashMap.get(indexValueForReplace);
+                            if (foundItemOfReplace != null) {
+                                unlink(foundItemOfReplace);
+                                foundItemOfReplace.setStoragePos(-1);
+                                foundItemOfReplace.setCsonObject(replaceCsonObject);
+                                foundItemOfReplace.storeIfNeed();
+                                commitResult.incrementCountOfReplace();
+                            }
+                            break;
+                    }
+                }
+            } else if(!isChangeOrder) {
                 return commitResult;
             }
-            for(int i = 0, n = transactionOrders.size(); i < n; ++i) {
-                TransactionOrder transactionOrder = transactionOrders.get(i);
-                CSONItem item = transactionOrder.getItem();
-                switch (transactionOrder.getOrder()) {
-                    case TransactionOrder.ORDER_REMOVE:
-                        Object indexValueOfRemove = item.getIndexValue();
-                        if((item = itemHashMap.remove(indexValueOfRemove)) != null) {
-                            commitResult.incrementCountOfRemove();
-                            unlink(item);
-                            item.release();
-                        }
-                        break;
-                    case TransactionOrder.ORDER_CLEAR:
-                        for(CSONItem clearItem : itemHashMap.values()) {
-                            unlink(clearItem);
-                            clearItem.release();
-                            commitResult.incrementCountOfRemove();
-                        }
-                        itemHashMap.clear();
-                        break;
-                    case TransactionOrder.ORDER_ADD:
-                    case TransactionOrder.ORDER_ADD_OR_REPLACE:
-                        CSONObject addOrReplaceCsonObject = item.getCsonObject();
-                        Object indexValueForAddOrReplace = item.getIndexValue();
-                        CSONItem foundItemOfAddOrReplace = itemHashMap.get(indexValueForAddOrReplace);
-                        if(foundItemOfAddOrReplace == null) {
-                            itemHashMap.put(indexValueForAddOrReplace, item);
-                            item.storeIfNeed();
-                            commitResult.incrementCountOfAdd();
-                        } else {
-                            unlink(foundItemOfAddOrReplace);
-                            foundItemOfAddOrReplace.setStoragePos(-1);
-                            foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
-                            foundItemOfAddOrReplace.storeIfNeed();
-                            commitResult.incrementCountOfReplace();
-                        }
-                        break;
-                    case TransactionOrder.ORDER_REPLACE:
-                        CSONObject replaceCsonObject = item.getCsonObject();
-                        Object indexValueForReplace = item.getIndexValue();
-                        CSONItem foundItemOfReplace = itemHashMap.get(indexValueForReplace);
-                        if(foundItemOfReplace != null) {
-                            unlink(foundItemOfReplace);
-                            foundItemOfReplace.setStoragePos(-1);
-                            foundItemOfReplace.setCsonObject(replaceCsonObject);
-                            foundItemOfReplace.storeIfNeed();
-                            commitResult.incrementCountOfReplace();
-                        }
-                        break;
-                }
-            }
-            int count = 0;
-            int memCacheLimit = getMemCacheSize();
-            for (CSONItem csonItem : itemHashMap.values()) {
-                if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
-                    try {
-                        unlink(csonItem);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    csonItem.setStoragePos(-1);
-                }
-                csonItem.storeIfNeed();
-                csonItem.setStore(count > memCacheLimit);
-                ++count;
-            }
+
+            isChangeOrder = false;
+            onMemStore();
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -238,8 +251,15 @@ public class IndexMap extends IndexCollectionBase {
     public Iterator<CSONObject> iterator() {
         readLock();
         Iterator<CSONItem> iterator = null;
+        boolean isAsc = this.getSort() > -1;
         try {
-            iterator = itemHashMap.values().iterator();
+            if(!isAsc) {
+                ArrayList<CSONItem> list = new ArrayList<>(itemHashMap.values());
+                Collections.reverse(list);
+                iterator = list.iterator();
+            } else {
+                iterator = itemHashMap.values().iterator();
+            }
         } finally {
             readUnlock();
         }
@@ -279,6 +299,9 @@ public class IndexMap extends IndexCollectionBase {
             public void remove() {
                 writeLock();
                 try {
+                    if(!isAsc) {
+                        itemHashMap.remove(current.getIndexValue());
+                    }
                     finalIterator.remove();
                     if (current != null) {
                         unlink(current);

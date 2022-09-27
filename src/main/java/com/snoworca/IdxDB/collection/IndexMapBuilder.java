@@ -24,8 +24,9 @@ public class IndexMapBuilder {
         indexMapOption = new IndexMapOption(name);
     }
 
-    public void setAccessOrder(boolean enable) {
+    public IndexMapBuilder setAccessOrder(boolean enable) {
         indexMapOption.setAccessOrder(enable);
+        return this;
     }
 
 
@@ -41,11 +42,12 @@ public class IndexMapBuilder {
     }
 
     public IndexMap create() {
-        IndexMap indexSet = new IndexMap(dataIO, indexMapOption);
+        IndexMap indexMap = new IndexMap(dataIO, indexMapOption);
         createLock.lock();
-        this.callback.onCreate(indexSet);
+        this.callback.onCreate(indexMap);
         createLock.unlock();
-        return indexSet;
+        return indexMap;
     }
+
 
 }

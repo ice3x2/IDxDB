@@ -5,7 +5,7 @@ import com.snoworca.cson.CSONObject;
 public class IndexMapOption extends CollectionOption {
 
     public IndexMapOption(String collectionName) {
-        super(IndexSet.class.getName(), collectionName);
+        super(IndexMap.class.getName(), collectionName);
     }
 
     public static IndexMapOption fromCSONObject(CSONObject csonObject) {
@@ -26,10 +26,6 @@ public class IndexMapOption extends CollectionOption {
     }
 
 
-
-    public int getIndexSort() {
-        return toCsonObject().optInteger("sort");
-    }
 
 
 }

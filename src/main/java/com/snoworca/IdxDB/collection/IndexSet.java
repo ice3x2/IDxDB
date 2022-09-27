@@ -31,7 +31,7 @@ public class IndexSet extends IndexCollectionBase {
 
 
     @Override
-    protected void onInit() {
+    protected void onInit(CollectionOption collectionOption) {
         itemSet = new TreeSet<>();
     }
 
@@ -40,13 +40,25 @@ public class IndexSet extends IndexCollectionBase {
         itemSet.add(csonItem);
     }
 
+
     @Override
-    protected Iterator<CSONItem> getCSONItemIterator() {
-        Iterator<CSONItem> iterator = itemSet.iterator();
-        return iterator;
+    protected void onMemStore() {
+        int count = 0;
+        int memCacheLimit = getMemCacheSize();
+        for (CSONItem csonItem : itemSet) {
+            if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
+                try {
+                    unlink(csonItem);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                csonItem.setStoragePos(-1);
+            }
+            csonItem.storeIfNeed();
+            csonItem.setStore(count > memCacheLimit);
+            ++count;
+        }
     }
-
-
 
     @Override
     public int size() {
@@ -140,21 +152,7 @@ public class IndexSet extends IndexCollectionBase {
                 }
             }
 
-            int count = 0;
-            int memCacheLimit = getMemCacheSize();
-            for (CSONItem csonItem : itemSet) {
-                if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
-                   try {
-                       unlink(csonItem);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    csonItem.setStoragePos(-1);
-                  }
-                  csonItem.storeIfNeed();
-                  csonItem.setStore(count > memCacheLimit);
-                  ++count;
-            }
+            onMemStore();
 
         } catch (IOException e) {
             throw new RuntimeException(e);

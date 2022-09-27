@@ -11,7 +11,7 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-abstract class IndexCollectionBase implements IndexCollection {
+public abstract class IndexCollectionBase implements IndexCollection {
 
     private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     private ReentrantReadWriteLock readWriteTransactionTempLock = new ReentrantReadWriteLock();
@@ -29,21 +29,23 @@ abstract class IndexCollectionBase implements IndexCollection {
     private int sort;
     private long headPos = -1;
 
+
     private CollectionOption collectionOption;
 
     IndexCollectionBase(DataIO dataIO, CollectionOption collectionOption) {
         this.dataIO = dataIO;
         this.name = collectionOption.getName();
-        this.memCacheSize = 0;
+        this.memCacheSize = collectionOption.getMemCacheSize();
         this.indexKey = collectionOption.getIndexKey();
         this.sort = collectionOption.getIndexSort();
         this.memCacheLimit = collectionOption.getMemCacheSize();
         this.headPos = collectionOption.getHeadPos();
-        onInit();
+        onInit(collectionOption);
         if (this.dataIO != null) {
             makeStoreDelegatorImpl();
         }
         initData();
+
         this.collectionOption = collectionOption;
     }
 
@@ -118,10 +120,11 @@ abstract class IndexCollectionBase implements IndexCollection {
         return true;
     }
 
-    protected abstract void onInit();
+    protected abstract void onInit(CollectionOption collectionOption);
 
     protected abstract void onRestoreCSONItem(CSONItem csonItem);
-    protected abstract Iterator<CSONItem> getCSONItemIterator();
+    protected abstract void onMemStore();
+
 
     public CSONObject getOptionInfo() {
         return new CSONObject(collectionOption.toCsonObject().toByteArray());
@@ -150,13 +153,8 @@ abstract class IndexCollectionBase implements IndexCollection {
                     csonItem.setStore(true);
                     onRestoreCSONItem(csonItem);
                 }
-                long count = 0;
-                Iterator<CSONItem> csonItemIterator = getCSONItemIterator();
-                while(csonItemIterator.hasNext()) {
-                    CSONItem csonItem = csonItemIterator.next();
-                    csonItem.setStore(count > memCacheLimit);
-                    ++count;
-                }
+
+                onMemStore();
 
 
             }

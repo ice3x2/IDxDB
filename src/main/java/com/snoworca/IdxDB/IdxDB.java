@@ -145,7 +145,7 @@ public class IdxDB {
                 String name = indexCollection.getName();
                 indexCollectionMap.put(name, indexCollection);
                 long headPos = indexCollection.getHeadPos();
-                CSONObject optionInfo = ((IndexSet)indexCollection).getOptionInfo();
+                CSONObject optionInfo = ((IndexCollectionBase)indexCollection).getOptionInfo();
                 optionInfo.put("headPos", headPos);
                 byte[] buffer = optionInfo.toByteArray();
                 try {
