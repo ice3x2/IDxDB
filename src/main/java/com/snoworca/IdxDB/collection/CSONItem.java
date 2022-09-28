@@ -140,6 +140,34 @@ class CSONItem implements Comparable<CSONItem> {
         return 0;
     }
 
+    public int compareIndex(Object targetIndexValue) {
+        Object thisObj = indexValue;
+        if(targetIndexValue == null && thisObj != null) {
+            return sort;
+        } else if(targetIndexValue != null && thisObj == null) {
+            return -sort;
+        } else if(targetIndexValue == null && thisObj == null) {
+            return 0;
+        }
+
+        if(targetIndexValue instanceof String && thisObj instanceof String) {
+            return ((String)thisObj).compareTo((String)targetIndexValue) * sort;
+        }
+        if(targetIndexValue instanceof String && thisObj instanceof Number) {
+
+            return ((String)thisObj).compareTo((String)targetIndexValue) * sort;
+        }
+        if(targetIndexValue instanceof Number && thisObj instanceof  Number) {
+            return compareTo((Number)thisObj, (Number)targetIndexValue) * sort;
+        }
+        if(targetIndexValue instanceof Boolean && thisObj instanceof  Boolean) {
+            return thisObj.equals(targetIndexValue) ? 0 :
+                    thisObj.equals(Boolean.TRUE) && thisObj.equals(Boolean.FALSE) ? sort : -1 * sort;
+        }
+        return 0;
+    }
+
+
     public Object getIndexValue() {
         return this.indexValue;
     }

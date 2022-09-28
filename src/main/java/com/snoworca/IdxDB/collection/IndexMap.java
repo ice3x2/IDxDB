@@ -70,6 +70,14 @@ public class IndexMap extends IndexCollectionBase {
             return result;
         }
         readLock();
+        ArrayList<CSONItem> allValues = null;
+        if(op != OP.eq) {
+            allValues = new ArrayList<>(itemHashMap.values());
+        }
+        if(getSort() < 0) {
+            Collections.reverse(allValues);
+        }
+
         try {
             switch (op) {
                 case eq:
@@ -77,12 +85,25 @@ public class IndexMap extends IndexCollectionBase {
                     if (csonItem != null) result.add(csonItem.getCsonObject());
                     isChangeOrder = isAccessOrder;
                     break;
+                case gte:
+
+
+
             }
         } finally {
             readUnlock();
         }
         return result;
     }
+
+    private List<CSONObject> search(ArrayList<CSONItem> allValues, Object indexValue, OP op) {
+        for(int i = 0, n = allValues.size(); i < n; ++i) {
+            CSONItem item = allValues.get(i);
+            if(item.compareTo())
+        }
+
+    }
+
 
     @Override
     public void removeByIndex(Object indexValue, FindOption option) {
