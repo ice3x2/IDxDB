@@ -19,11 +19,16 @@
     File file = new File("yes.db");
     IdxDB idxDB = IdxDB.newMaker(file).make();
     ```
+    
+   * 쿼리 사용
+     ```java
+     String result = idxDB.executeQuery("{json 쿼리 문자열}");
+      ```
 
    * 인덱스셋 생성
      * 인덱스셋은 자바의 TreeSet을 이용함. 중복되는 인덱스를 가질수 없다. 
      ```java
-     IndexCollection set = 
+     IndexCollection collection = 
      // 이름을 D005930으로 설정한다.
      idxDB.newIndexSetBuilder("D005930")
      // 인덱스 키를 설정하고 오름차순 정렬
@@ -33,11 +38,22 @@
      // 생성
      .create();
       ```
+      
+      ```json
+     { "method": "newIndexSet", 
+       "argument" : {
+                      "name": ""D005930",
+                      "index": {"date" : 1 },
+                      "memCacheSize": 1000
+                     }
+     }
+      ```
+      
 
   * 인덱스맵 생성
      * 인덱스맵은 자바의 LinkedHashmap을 이용하며 실제로 동일하게 동작한다.
      ```java
-     IndexCollection map = 
+     IndexCollection collection = 
      // 이름을 FIN_STATE로 설정한다.
      idxDB.newIndexMapBuilder("FIN_STATE")
      // 인덱스 키를 설정.
@@ -50,4 +66,21 @@
      // 생성
      .create();
       ```
+      ```json
+     { "method": "newIndexMap", 
+       "argument" : {
+                      "name": "FIN_STATE",
+                      "index": {"code" : -1 },
+                      "accessOrder": true,
+                      "memCacheSize": 1000
+                     }
+     }
+      ```
       
+  * 데이터 삽입
+    * 만약 동일한 index를 갖는 데이터가 있다면, 아무 동작도 발생하지 않는다.
+     ```java
+      collection.add(new CSONObject().put("date", 20210830).put("start",54300").put("end",57400).put("volume",1013930);
+      collection.commit();
+     ```
+     
