@@ -4,10 +4,11 @@ import com.snoworca.IdxDB.exception.MissingIndexValueException;
 import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
+import java.util.regex.Pattern;
 
 class CSONItem implements Comparable<CSONItem> {
 
-
+    private final static Pattern NUM_PATTERN = Pattern.compile("[+-]?([0-9]*[.])?[0-9]+");
 
     CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String key, int sort) {
         this.storeDelegator = storeDelegator;
@@ -118,27 +119,49 @@ class CSONItem implements Comparable<CSONItem> {
     @Override
     public int compareTo(CSONItem o) {
         Object targetObj = o.getIndexValue();
+        return compareIndex(targetObj);
+    }
+
+
+    public int compareIndex(Object targetIndexValue) {
         Object thisObj = indexValue;
-        if(targetObj == null && thisObj != null) {
+        if(targetIndexValue == null && thisObj != null) {
             return sort;
-        } else if(targetObj != null && thisObj == null) {
+        } else if(targetIndexValue != null && thisObj == null) {
             return -sort;
-        } else if(targetObj == null && thisObj == null) {
+        } else if(targetIndexValue == null && thisObj == null) {
             return 0;
         }
 
-        if(targetObj instanceof String && thisObj instanceof String) {
-            return ((String)thisObj).compareTo((String)targetObj) * sort;
+        if(targetIndexValue instanceof String && thisObj instanceof String) {
+            return ((String)thisObj).compareTo((String)targetIndexValue) * sort;
         }
-        if(targetObj instanceof Number && thisObj instanceof  Number) {
-            return compareTo((Number)thisObj, (Number)targetObj) * sort;
+        if(targetIndexValue instanceof Number && thisObj instanceof  Number) {
+            return compareTo((Number)thisObj, (Number)targetIndexValue) * sort;
         }
-        if(targetObj instanceof Boolean && thisObj instanceof  Boolean) {
-            return thisObj.equals(targetObj) ? 0 :
-                   thisObj.equals(Boolean.TRUE) && thisObj.equals(Boolean.FALSE) ? sort : -1 * sort;
+        if(targetIndexValue instanceof Boolean && thisObj instanceof  Boolean) {
+            return thisObj.equals(targetIndexValue) ? 0 :
+                    thisObj.equals(Boolean.TRUE) && thisObj.equals(Boolean.FALSE) ? sort : -1 * sort;
         }
-        return 0;
+
+        if(targetIndexValue instanceof String && thisObj instanceof  Number) {
+            try {
+                Double targetDoubleValue = Double.valueOf((String)targetIndexValue);
+                return compareTo((Number)thisObj, targetDoubleValue) * sort;
+            } catch (NumberFormatException ignored) {}
+        }
+        if(targetIndexValue instanceof Number && thisObj instanceof String) {
+            try {
+                Double thisDoubleValue = Double.valueOf((String)thisObj);
+                return compareTo(thisDoubleValue, (Number)targetIndexValue) * sort;
+            } catch (NumberFormatException ignored) {}
+        }
+
+        return thisObj.toString().compareTo(targetIndexValue.toString()) * sort;
+
+
     }
+
 
     public Object getIndexValue() {
         return this.indexValue;

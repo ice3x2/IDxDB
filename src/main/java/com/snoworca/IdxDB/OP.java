@@ -12,15 +12,15 @@ public enum OP {
      /** value 보다 작거나 같은 */
     lte,
      /** value 와 일치하지 않음 */
-    ne,
+    ne;
      /** value 가 포함되어 있음 */
-    in,
+    //in,
      /** value 가 포함되어 있지 않다. */
-     nin,
-    and,
-    or,
-    not,
-    nor;
+     //nin,
+    //and,
+    //or,
+    //not,
+    //nor;
 
 
     public static OP fromString(String value) {
@@ -28,9 +28,10 @@ public enum OP {
         else if("gte".equalsIgnoreCase(value)) return gte;
         else if("lt".equalsIgnoreCase(value)) return lt;
         else if("lte".equalsIgnoreCase(value)) return lte;
-        else if("not".equalsIgnoreCase(value)) return not;
-        else if("in".equalsIgnoreCase(value)) return in;
+        //else if("not".equalsIgnoreCase(value)) return not;
+        //else if("in".equalsIgnoreCase(value)) return in;
         else if("eq".equalsIgnoreCase(value)) return eq;
+        else if("ne".equalsIgnoreCase(value)) return ne;
 
         return null;
     }
