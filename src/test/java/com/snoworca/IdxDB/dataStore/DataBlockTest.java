@@ -97,11 +97,10 @@ public class DataBlockTest {
         DataBlock block = DataBlock.newDataBlock(value);
         byte[] buffer = block.toBuffer();
 
-        int lenA = ThreadLocalRandom.current().nextInt(100) + 10;
+        int lenA = ThreadLocalRandom.current().nextInt(100) + DataBlockHeader.HEADER_SIZE;
         byte[] bufferA = Arrays.copyOfRange(buffer, 0, lenA);
         byte[] bufferB = Arrays.copyOfRange(buffer, lenA, lenA + 10);
         byte[] bufferC = Arrays.copyOfRange(buffer, lenA + 10, buffer.length);
-
 
         ByteBuffer byteBufferA = ByteBuffer.wrap(bufferA);
         ByteBuffer byteBufferB = ByteBuffer.wrap(bufferB);
