@@ -5,6 +5,7 @@ import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
 
 public class IndexMap extends IndexCollectionBase {
@@ -73,10 +74,11 @@ public class IndexMap extends IndexCollectionBase {
         ArrayList<CSONItem> allValues = null;
         if(op != OP.eq) {
             allValues = new ArrayList<>(itemHashMap.values());
+            if(getSort() < 0) {
+                Collections.reverse(allValues);
+            }
         }
-        if(getSort() < 0) {
-            Collections.reverse(allValues);
-        }
+
 
         try {
             switch (op) {
@@ -85,10 +87,8 @@ public class IndexMap extends IndexCollectionBase {
                     if (csonItem != null) result.add(csonItem.getCsonObject());
                     isChangeOrder = isAccessOrder;
                     break;
-                case gte:
-
-
-
+                default:
+                    result = search(allValues, indexValue, op, limit);
             }
         } finally {
             readUnlock();
@@ -96,11 +96,38 @@ public class IndexMap extends IndexCollectionBase {
         return result;
     }
 
-    private List<CSONObject> search(ArrayList<CSONItem> allValues, Object indexValue, OP op) {
+    private ArrayList<CSONObject> search(ArrayList<CSONItem> allValues, Object indexValue, OP op, int limit) {
+        ArrayList<CSONObject> result = new ArrayList<>();
+        int count = 0;
+        int sort = getSort();
         for(int i = 0, n = allValues.size(); i < n; ++i) {
             CSONItem item = allValues.get(i);
-            if(item.compareTo())
+            int compare = item.compareIndex(indexValue) * sort;
+            if(compare >= 0 && OP.gte == op) {
+                result.add(item.getCsonObject());
+                ++count;
+            }
+            else if(compare > 0 && OP.gt == op) {
+                result.add(item.getCsonObject());
+                ++count;
+            }
+            else if(compare <= 0 && OP.lte == op) {
+                result.add(item.getCsonObject());
+                ++count;
+            }
+            else if(compare < 0 && OP.lt == op) {
+                result.add(item.getCsonObject());
+                ++count;
+            }
+            else if(compare != 0 && OP.ne == op) {
+                result.add(item.getCsonObject());
+                ++count;
+            }
+            if(count == limit) {
+                break;
+            }
         }
+        return result;
 
     }
 

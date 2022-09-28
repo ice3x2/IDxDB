@@ -40,10 +40,10 @@ public class CompareUtil {
                 return value.equals(originValue);
             case ne:
                 return !value.equals(originValue);
-            case in:
-                return originValue.toString().contains(value);
-            case nin:
-                return !originValue.toString().contains(value);
+            //case in:
+            //    return originValue.toString().contains(value);
+            //case nin:
+             //   return !originValue.toString().contains(value);
             case gt:
                 return originValue.toString().compareToIgnoreCase(value) > 0;
             case gte:
@@ -73,14 +73,14 @@ public class CompareUtil {
                 return value == originValue;
             case ne:
                 return value != originValue;
-            case nin:
+            //case nin:
             case gt:
                 return originValue > value;
             case gte:
                 return originValue >= value;
             case lt:
                 return originValue < value;
-            case in:
+            //case in:
             case lte:
                 return originValue <= value;
         }
@@ -103,14 +103,14 @@ public class CompareUtil {
                 return value == originValue;
             case ne:
                 return value != originValue;
-            case nin:
+            //case nin:
             case gt:
                 return originValue > value;
             case gte:
                 return originValue >= value;
             case lt:
                 return originValue < value;
-            case in:
+            //case in:
             case lte:
                 return originValue <= value;
         }
@@ -134,14 +134,14 @@ public class CompareUtil {
                 return value == originValue;
             case ne:
                 return value != originValue;
-            case nin:
+            //case nin:
             case gt:
                 return originValue > value;
             case gte:
                 return originValue >= value;
             case lt:
                 return originValue < value;
-            case in:
+            //case in:
             case lte:
                 return originValue <= value;
         }
@@ -164,14 +164,14 @@ public class CompareUtil {
                 return value == originValue;
             case ne:
                 return value != originValue;
-            case nin:
+            //case nin:
             case gt:
                 return originValue > value;
             case gte:
                 return originValue >= value;
             case lt:
                 return originValue < value;
-            case in:
+            //case in:
             case lte:
                 return originValue <= value;
         }
@@ -195,14 +195,14 @@ public class CompareUtil {
                 return originValue.equals(value);
             case ne:
                 return !originValue.equals(originValue);
-            case nin:
+            //case nin:
             case gt:
                 return originValue > value;
             case gte:
                 return originValue >= value;
             case lt:
                 return originValue < value;
-            case in:
+            //case in:
             case lte:
                 return originValue <= value;
         }
@@ -225,14 +225,14 @@ public class CompareUtil {
                 return originValue.equals(value);
             case ne:
                 return !originValue.equals(value);
-            case nin:
+            //case nin:
             case gt:
                 return originValue > value;
             case gte:
                 return originValue >= value;
             case lt:
                 return originValue < value;
-            case in:
+            //case in:
             case lte:
                 return originValue <= value;
         }
