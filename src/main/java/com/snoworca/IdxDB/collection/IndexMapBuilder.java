@@ -35,6 +35,11 @@ public class IndexMapBuilder {
         return this;
     }
 
+    public IndexMapBuilder setMemCacheIndex(boolean enable) {
+        indexMapOption.setMemCacheIndex(enable);
+        return this;
+    }
+
 
     public IndexMapBuilder memCacheSize(int limit) {
         indexMapOption.setMemCacheSize(limit);

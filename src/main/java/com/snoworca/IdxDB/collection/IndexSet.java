@@ -434,6 +434,7 @@ public class IndexSet extends IndexCollectionBase {
                 try {
                     finalIterator.remove();
                     if (current != null) {
+                        cacheSet.remove(current);
                         unlink(current);
                     }
                 } catch (IOException e) {

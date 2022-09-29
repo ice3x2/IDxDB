@@ -11,7 +11,9 @@ import java.util.*;
 public class IndexMap extends IndexCollectionBase {
 
 
-    private LinkedHashMap<Object, CSONItem> itemHashMap;
+
+    private AccessOrderCtrlLinkedHashMap<Object, CSONItem> itemHashMap;
+    private AccessOrderCtrlLinkedHashMap<Object, CSONItem> itemHashCacheMap;
 
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
     private static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
@@ -27,8 +29,8 @@ public class IndexMap extends IndexCollectionBase {
     @Override
     protected void onInit(CollectionOption collectionOption) {
         isAccessOrder = ((IndexMapOption)collectionOption).isAccessOrder();
-        itemHashMap = new LinkedHashMap<>(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, isAccessOrder);
-
+        itemHashMap = new AccessOrderCtrlLinkedHashMap<>(isAccessOrder);
+        itemHashCacheMap = new AccessOrderCtrlLinkedHashMap<>(isAccessOrder);
     }
 
     @Override
@@ -36,6 +38,13 @@ public class IndexMap extends IndexCollectionBase {
 
         itemHashMap.put(csonItem.getIndexValue(), csonItem);
     }
+
+    private CSONItem get(Object indexValue) {
+        CSONItem csonItem = itemHashMap_.get(indexValue);
+
+        return csonItem;
+    }
+
 
     @Override
     protected void onMemStore() {
@@ -83,7 +92,7 @@ public class IndexMap extends IndexCollectionBase {
         try {
             switch (op) {
                 case eq:
-                    CSONItem csonItem = itemHashMap.get(indexValue);
+                    CSONItem csonItem = get(indexValue);
                     if (csonItem != null) result.add(csonItem.getCsonObject());
                     isChangeOrder = isAccessOrder;
                     break;
@@ -141,7 +150,7 @@ public class IndexMap extends IndexCollectionBase {
         try {
             switch (op) {
                 case eq:
-                    CSONItem csonItem = itemHashMap.get(indexValue);
+                    CSONItem csonItem = itemHashMap_.get(indexValue);
                     if (csonItem != null) removeTransactionOrder(csonItem.getCsonObject());
                     break;
             }
@@ -294,6 +303,19 @@ public class IndexMap extends IndexCollectionBase {
     }
 
 
+    private class AccessOrderCtrlLinkedHashMap<K,E> extends LinkedHashMap<K,E> {
+        AccessOrderCtrlLinkedHashMap(boolean accessOrder) {
+            super(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, accessOrder);
+        }
+
+        public E getNoneOrder(Object key) {
+            boolean defaultAccessOrder = isAccessOrder;
+            isAccessOrder = false;
+            E e = super.get(key);
+            isAccessOrder = defaultAccessOrder;
+            return e;
+        }
+    }
 
     @Override
     public Iterator<CSONObject> iterator() {
