@@ -21,6 +21,8 @@ public class IndexSetBuilder {
     }
 
 
+
+
     IndexSetBuilder(String name, DataIO dataIO) {
         indexSetOption = new IndexSetOption(name);
     }
@@ -42,6 +44,15 @@ public class IndexSetBuilder {
         indexSetOption.setMemCacheSize(limit);
         return this;
     }
+
+
+    public IndexSetBuilder setMemCacheIndex(boolean enable) {
+        indexSetOption.setMemCacheIndex(enable);
+        return this;
+    }
+
+
+
 
     public IndexSet create() {
         IndexSet indexSet = new IndexSet(dataIO, indexSetOption);

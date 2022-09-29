@@ -29,6 +29,8 @@ public abstract class IndexCollectionBase implements IndexCollection {
     private int sort;
     private long headPos = -1;
 
+    private boolean isMemCacheIndex = true;
+
 
     private CollectionOption collectionOption;
 
@@ -40,11 +42,13 @@ public abstract class IndexCollectionBase implements IndexCollection {
         this.sort = collectionOption.getIndexSort();
         this.memCacheLimit = collectionOption.getMemCacheSize();
         this.headPos = collectionOption.getHeadPos();
+        this.isMemCacheIndex = collectionOption.isMemCacheIndex();
         onInit(collectionOption);
         if (this.dataIO != null) {
             makeStoreDelegatorImpl();
         }
         initData();
+
 
         this.collectionOption = collectionOption;
     }
@@ -148,7 +152,8 @@ public abstract class IndexCollectionBase implements IndexCollection {
                     lastDataStorePos = dataBlock.getPos();
                     CSONObject csonObject = new CSONObject(buffer);
                     Object indexValue = csonObject.opt(indexKey);
-                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, sort);
+                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, sort, isMemCacheIndex);
+
                     csonItem.setStoragePos(lastDataStorePos);
                     csonItem.setStore(true);
                     onRestoreCSONItem(csonItem);
@@ -204,7 +209,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     protected void addTransactionOrder(CSONObject csonObject) {
         ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
         writeLock.lock();
-        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort,isMemCacheIndex);
         transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_ADD, item));
         writeLock.unlock();
     }
@@ -212,7 +217,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     protected void addOrReplaceTransactionOrder(CSONObject csonObject) {
         ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
         writeLock.lock();
-        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort,isMemCacheIndex);
         transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, item));
         writeLock.unlock();
     }
@@ -224,13 +229,13 @@ public abstract class IndexCollectionBase implements IndexCollection {
         ArrayList<TransactionOrder> list = new ArrayList<>(csonObjects.size());
         if(csonObjects instanceof  ArrayList) {
             for (int i = 0, n = csonObjects.size(); i < n; ++i) {
-                CSONItem item = new CSONItem(storeDelegator, ((ArrayList<CSONObject>) csonObjects).get(i), indexKey, sort);
+                CSONItem item = new CSONItem(storeDelegator, ((ArrayList<CSONObject>) csonObjects).get(i), indexKey, sort,isMemCacheIndex);
                 list.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, item));
             }
 
         } else {
             for(CSONObject csonObject : csonObjects) {
-                CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+                CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort,isMemCacheIndex);
                 list.add(new TransactionOrder(TransactionOrder.ORDER_ADD_OR_REPLACE, item));
             }
         }
@@ -257,13 +262,13 @@ public abstract class IndexCollectionBase implements IndexCollection {
         ArrayList<TransactionOrder> list = new ArrayList<>(csonObjects.size());
         if(csonObjects instanceof  ArrayList) {
             for (int i = 0, n = csonObjects.size(); i < n; ++i) {
-                CSONItem item = new CSONItem(storeDelegator, ((ArrayList<CSONObject>) csonObjects).get(i), indexKey, sort);
+                CSONItem item = new CSONItem(storeDelegator, ((ArrayList<CSONObject>) csonObjects).get(i), indexKey, sort,isMemCacheIndex);
                 list.add(new TransactionOrder(TransactionOrder.ORDER_ADD, item));
             }
 
         } else {
             for(CSONObject csonObject : csonObjects) {
-                CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+                CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort,isMemCacheIndex);
                 list.add(new TransactionOrder(TransactionOrder.ORDER_ADD, item));
             }
         }
@@ -275,7 +280,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     protected void replaceTransactionOrder(CSONObject csonObject) {
         ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
         writeLock.lock();
-        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort,isMemCacheIndex);
         transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_REPLACE, item));
         writeLock.unlock();
     }
@@ -283,7 +288,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     protected void removeTransactionOrder(CSONObject csonObject) {
         ReentrantReadWriteLock.WriteLock writeLock = readWriteTransactionTempLock.writeLock();
         writeLock.lock();
-        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort);
+        CSONItem item = new CSONItem(storeDelegator, csonObject, indexKey, sort,isMemCacheIndex);
         transactionOrders.add(new TransactionOrder(TransactionOrder.ORDER_REMOVE, item));
         writeLock.unlock();
     }

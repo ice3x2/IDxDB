@@ -10,6 +10,8 @@ public class IndexSetOption extends CollectionOption {
     public void setFileStore(boolean fileStoreEnable) {
         toCsonObject().put("fileStore", fileStoreEnable);
     }
+
+
     public boolean isFileStore() {
         return toCsonObject().optBoolean("fileStore", true);
     }

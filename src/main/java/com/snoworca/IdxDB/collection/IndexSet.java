@@ -12,12 +12,13 @@ import java.util.*;
 public class IndexSet extends IndexCollectionBase {
 
     private TreeSet<CSONItem> itemSet;
+    private TreeSet<CSONItem> cacheSet;
 
     private StoreDelegator storeDelegator;
     private String indexKey;
     private int indexSort;
 
-
+    private boolean isMemCacheIndex;
 
 
     public IndexSet(DataIO dataIO, IndexSetOption option) {
@@ -25,6 +26,7 @@ public class IndexSet extends IndexCollectionBase {
         this.indexKey = super.getIndexKey();
         this.storeDelegator = super.getStoreDelegator();
         this.indexSort = super.getSort();
+        this.isMemCacheIndex = option.isMemCacheIndex();
 
 
     }
@@ -176,7 +178,7 @@ public class IndexSet extends IndexCollectionBase {
 
     private CSONItem get_(CSONObject csonObject) {
         String indexKey = getIndexKey();
-        CSONItem item = new CSONItem(getStoreDelegator(),csonObject,indexKey, getSort());
+        CSONItem item = new CSONItem(getStoreDelegator(),csonObject,indexKey, getSort(), isMemCacheIndex );
         CSONItem foundItem = itemSet.floor(item);
         if(foundItem == null || !CompareUtil.compare(foundItem.getIndexValue(), csonObject.opt(indexKey), OP.eq)) {
             return null;
@@ -306,7 +308,7 @@ public class IndexSet extends IndexCollectionBase {
 
     private CSONItem makeIndexItem(Object index) {
         CSONObject indexJson = new CSONObject().put(indexKey, index);
-        CSONItem indexItem = new CSONItem(storeDelegator,indexJson, indexKey, indexSort);
+        CSONItem indexItem = new CSONItem(storeDelegator,indexJson, indexKey, indexSort, isMemCacheIndex);
         return indexItem;
     }
 
@@ -337,9 +339,9 @@ public class IndexSet extends IndexCollectionBase {
         ArrayList<CSONItem> list = new ArrayList<>();
         for(Object obj : c) {
             if(obj instanceof CSONObject) {
-                list.add(new CSONItem(storeDelegator,(CSONObject) obj, indexKey, indexSort));
+                list.add(new CSONItem(storeDelegator,(CSONObject) obj, indexKey, indexSort, isMemCacheIndex));
             } else {
-                list.add(new CSONItem(storeDelegator,new CSONObject().put(indexKey, obj), indexKey, indexSort));
+                list.add(new CSONItem(storeDelegator,new CSONObject().put(indexKey, obj), indexKey, indexSort, isMemCacheIndex));
             }
         }
         return list;

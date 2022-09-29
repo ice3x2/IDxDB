@@ -400,12 +400,6 @@ class IdxDBTest {
         file.delete();
 
 
-
-
-
-
-
-
     }
 
 }

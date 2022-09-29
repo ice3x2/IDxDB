@@ -4,47 +4,36 @@ import com.snoworca.IdxDB.exception.MissingIndexValueException;
 import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 class CSONItem implements Comparable<CSONItem> {
 
     private final static Pattern NUM_PATTERN = Pattern.compile("[+-]?([0-9]*[.])?[0-9]+");
 
-    CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String key, int sort) {
+
+
+    CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String IndexKey, int sort, boolean memCacheIndex) {
         this.storeDelegator = storeDelegator;
-        this.indexKey = key;
+        this.indexKey = IndexKey;
         this.sort = sort;
         this.csonObject = csonObject;
-        /*if(this.csonObject == null && storeDelegator != null) {
-
-        }*/
         this.indexValue = csonObject.opt(indexKey);
+        this.isMemCacheIndex = memCacheIndex;
         if(this.indexValue == null) {
             throw new MissingIndexValueException(indexKey, csonObject);
         }
     }
 
-    CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String key,Object indexValue) {
-        this.storeDelegator = storeDelegator;
-        this.indexKey = key;
-        this.sort = 1;
-        this.csonObject = csonObject;
-        /*if(this.csonObject == null && storeDelegator != null) {
-            isFileCache = true;
-        }*/
-        this.indexValue = indexValue;
-    }
-
-
-    CSONItem(StoreDelegator storeDelegator, String key,Object indexValue, int sort) {
+    CSONItem(StoreDelegator storeDelegator, String key,Object indexValue, int sort, boolean memCacheIndex) {
         this.storeDelegator = storeDelegator;
         this.indexKey = key;
         this.sort = sort;
-        this.csonObject = csonObject;
         if(this.csonObject == null && storeDelegator != null) {
             isStorageSaved = true;
         }
         this.indexValue = indexValue;
+        this.isMemCacheIndex = memCacheIndex;
     }
 
 
@@ -57,6 +46,7 @@ class CSONItem implements Comparable<CSONItem> {
     private StoreDelegator storeDelegator;
     private boolean isChanged = false;
 
+    private boolean isMemCacheIndex = true;
 
     public boolean isChanged() {
         return isChanged;
@@ -101,10 +91,14 @@ class CSONItem implements Comparable<CSONItem> {
                 storagePos = storeDelegator.cache(csonObject.toByteArray());
                 isStorageSaved = true;
             }
+            if(!isMemCacheIndex) this.indexValue = null;
             this.csonObject = null;
         }
         else if(this.csonObject == null) {
             this.csonObject = getCsonObject();
+            if(this.indexValue == null) {
+                this.indexValue = this.csonObject.opt(indexKey);
+            }
         }
     }
 
@@ -124,7 +118,7 @@ class CSONItem implements Comparable<CSONItem> {
 
 
     public int compareIndex(Object targetIndexValue) {
-        Object thisObj = indexValue;
+        Object thisObj = getIndexValue();
         if(targetIndexValue == null && thisObj != null) {
             return sort;
         } else if(targetIndexValue != null && thisObj == null) {
@@ -162,20 +156,24 @@ class CSONItem implements Comparable<CSONItem> {
 
     }
 
-
     public Object getIndexValue() {
-        return this.indexValue;
+        if(isMemCacheIndex || this.indexValue != null) {
+            return this.indexValue;
+        }
+        return getCsonObject().opt(indexKey);
     }
 
-    public void setIndexValue(Object object) {
+    /*public void setIndexValue(Object object) {
         this.indexValue = object == null ? Integer.valueOf(0) : object;
-    }
+    }*/
 
     @Override
     public boolean equals(Object obj) {
         if(obj == this) return true;
         else if(obj == null) return false;
-        if(obj instanceof CSONItem && /*compareTo((CSONItem)obj) == 0*/ indexValue.equals(((CSONItem)obj).indexValue)) {
+        Object indexValue = getIndexValue();
+
+        if(obj instanceof CSONItem && /*compareTo((CSONItem)obj) == 0*/ indexValue.equals(((CSONItem)obj).getIndexValue())) {
             return true;
         }
         return false;
@@ -183,7 +181,7 @@ class CSONItem implements Comparable<CSONItem> {
 
     @Override
     public int hashCode() {
-        Object obj = indexValue;
+        Object obj = getIndexValue();
         if(obj == null) return 0;
         return obj.hashCode();
     }
