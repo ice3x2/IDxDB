@@ -5,6 +5,7 @@ import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
+import sun.reflect.generics.tree.Tree;
 
 import java.io.IOException;
 import java.util.*;
@@ -35,6 +36,7 @@ public class IndexSet extends IndexCollectionBase {
     @Override
     protected void onInit(CollectionOption collectionOption) {
         itemSet = new TreeSet<>();
+        cacheSet = new TreeSet<>();
     }
 
     @Override
@@ -57,7 +59,11 @@ public class IndexSet extends IndexCollectionBase {
                 csonItem.setStoragePos(-1);
             }
             csonItem.storeIfNeed();
-            csonItem.setStore(count > memCacheLimit);
+            boolean isMemCache = count > memCacheLimit;
+            csonItem.setStore(isMemCache);
+            if(isMemCache) {
+                cacheSet.add(csonItem);
+            }
             ++count;
         }
     }
@@ -72,12 +78,39 @@ public class IndexSet extends IndexCollectionBase {
 
 
 
+    private void removeCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return;
+        cacheSet.remove(item);
+        Set<CSONItem> subSet = cacheSet.isEmpty() ? itemSet : itemSet.tailSet(cacheSet.last(), false);
+        Iterator<CSONItem> iterator = subSet.iterator();
+        while(iterator.hasNext() && cacheSet.size() < memCacheSize) {
+            CSONItem csonItem = iterator.next();
+            cacheSet.add(csonItem);
+            csonItem.setStore(false);
+        }
+    }
+
+
+    private void addCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return;
+        cacheSet.add(item);
+        if (cacheSet.size() > memCacheSize) {
+            CSONItem csonItem = cacheSet.pollLast();
+            if(csonItem != null) {
+                csonItem.setStore(true);
+            }
+        }
+
+    }
+
+
     @Override
     public synchronized CommitResult commit() {
 
         ArrayList<TransactionOrder> transactionOrders = getTransactionOrders();
         writeLock();
         CommitResult commitResult = new CommitResult();
+        int memCacheSize = getMemCacheSize();
         try {
             if(transactionOrders.isEmpty()) {
                 return commitResult;
@@ -88,7 +121,10 @@ public class IndexSet extends IndexCollectionBase {
                 CSONItem item = transactionOrder.getItem();
                 switch (transactionOrder.getOrder()) {
                     case TransactionOrder.ORDER_ADD:
-                        if(itemSet.add(item)) commitResult.incrementCountOfAdd();
+                        if(itemSet.add(item)) {
+                            addCache(memCacheSize, item);
+                            commitResult.incrementCountOfAdd();
+                        }
                         item.storeIfNeed();
                         indexChanged = true;
                     break;
@@ -98,6 +134,8 @@ public class IndexSet extends IndexCollectionBase {
                             if(realItem != null) item = realItem;
                         }
                         if(itemSet.remove(item)) {
+                            removeCache(memCacheSize, item);
+
                             commitResult.incrementCountOfRemove();
                         }
                         unlink(item);
@@ -110,6 +148,7 @@ public class IndexSet extends IndexCollectionBase {
                             clearItem.release();
                             commitResult.incrementCountOfRemove();
                         }
+                        cacheSet.clear();
                         itemSet.clear();
                     break;
                     case TransactionOrder.ORDER_ADD_OR_REPLACE:
@@ -117,6 +156,7 @@ public class IndexSet extends IndexCollectionBase {
                         CSONItem foundItemOfAddOrReplace = get_(addOrReplaceCsonObject);
                         if(foundItemOfAddOrReplace == null) {
                             itemSet.add(item);
+                            addCache(memCacheSize, item);
                             item.storeIfNeed();
                             commitResult.incrementCountOfAdd();
                         } else {
@@ -132,7 +172,6 @@ public class IndexSet extends IndexCollectionBase {
                             foundItemOfAddOrReplace.storeIfNeed();
                             commitResult.incrementCountOfReplace();
                         }
-
                     break;
                     case TransactionOrder.ORDER_REPLACE:
                         CSONObject replaceCsonObject = item.getCsonObject();
@@ -153,8 +192,8 @@ public class IndexSet extends IndexCollectionBase {
                     break;
                 }
             }
+            //onMemStore();
 
-            onMemStore();
 
         } catch (IOException e) {
             throw new RuntimeException(e);

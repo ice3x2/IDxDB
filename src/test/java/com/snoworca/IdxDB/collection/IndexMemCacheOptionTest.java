@@ -12,12 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class IndexMemCacheOptionTest {
 
     @Test
-    public void indexMemCacheOptionTest() throws IOException {
+    public void indexSetMemCacheOptionTest() throws IOException {
         File dbFile = new File("indexMemCacheTest.db");
         dbFile.delete();
         IdxDB idxDB = IdxDB.newMaker(dbFile).make();
-        IndexCollection collectionMemCache = idxDB.newIndexSetBuilder("memCacheIndex").index("key", 1).setMemCacheIndex(true).create();
-        IndexCollection collectionNoCache = idxDB.newIndexSetBuilder("noCacheIndex").index("key", 1).setMemCacheIndex(false).create();
+        IndexCollection collectionMemCache = idxDB.newIndexSetBuilder("memCacheIndex").index("key", 1).memCacheSize(3000).setMemCacheIndex(true).create();
+        IndexCollection collectionNoCache = idxDB.newIndexSetBuilder("noCacheIndex").index("key", 1).memCacheSize(3000).setMemCacheIndex(false).create();
 
         for(int i = 0; i < 1000; ++i) {
             collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));
@@ -32,6 +32,11 @@ public class IndexMemCacheOptionTest {
             collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));
             collectionMemCache.commit();
         }
+        collectionMemCache.removeByIndex("1");
+        collectionMemCache.removeByIndex("50000");
+        collectionMemCache.removeByIndex("100000");
+        collectionMemCache.commit();
+
         long timeLap1 = System.currentTimeMillis() - start + 1;
         System.out.println("인덱스 값 메모리 캐쉬:" + timeLap1 + "ms");
 
@@ -40,6 +45,10 @@ public class IndexMemCacheOptionTest {
             collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i));
             collectionNoCache.commit();
         }
+        collectionMemCache.removeByIndex("1");
+        collectionMemCache.removeByIndex("50000");
+        collectionMemCache.removeByIndex("100000");
+        collectionMemCache.commit();
         long timeLap2 = System.currentTimeMillis() - start + 1;
         System.out.println("인덱스 값 노 캐쉬:"+ timeLap2 + "ms");
 
@@ -50,9 +59,5 @@ public class IndexMemCacheOptionTest {
 
         assertTrue(timeLap2 > ( timeLap1 * 1.1));
         dbFile.delete();
-
-
-
-
     }
 }

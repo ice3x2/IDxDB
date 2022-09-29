@@ -21,6 +21,7 @@ public class IdxDB {
 
     private final static String META_INFO_TYPE_ENTRY = "entry";
 
+
     private ConcurrentHashMap<String, IndexCollection> indexCollectionMap = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
     private ReentrantLock collectionMutableLock = new ReentrantLock();

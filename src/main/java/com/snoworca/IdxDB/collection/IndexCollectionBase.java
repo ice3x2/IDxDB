@@ -90,6 +90,12 @@ public abstract class IndexCollectionBase implements IndexCollection {
         return true;
     }
 
+
+    @Override
+    public void removeByIndex(Object indexValue) {
+        removeByIndex(indexValue, FindOption.fromOP(OP.eq));
+    }
+
     @Override
     public boolean remove(CSONObject o) {
         if(!checkIndexKey(o)) {
