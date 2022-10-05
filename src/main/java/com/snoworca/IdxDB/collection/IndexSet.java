@@ -100,7 +100,6 @@ public class IndexSet extends IndexCollectionBase {
                 csonItem.setStore(true);
             }
         }
-
     }
 
 
@@ -135,7 +134,6 @@ public class IndexSet extends IndexCollectionBase {
                         }
                         if(itemSet.remove(item)) {
                             removeCache(memCacheSize, item);
-
                             commitResult.incrementCountOfRemove();
                         }
                         unlink(item);

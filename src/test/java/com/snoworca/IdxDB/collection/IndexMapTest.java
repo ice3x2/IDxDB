@@ -14,6 +14,17 @@ import static org.junit.jupiter.api.Assertions.*;
 class IndexMapTest {
 
     @Test
+    public void indexMapCacheTest() throws IOException {
+        File dbFile = new File("indexMapFindTest.db");
+        IdxDB idxDB = IdxDB.newMaker(dbFile).make();
+        IndexCollection collection = idxDB.newIndexMapBuilder("map").memCacheSize(100).index("index", -1).setAccessOrder(true).create();
+        for(int i = 0; i < 1000; ++i) {
+            collection.add(new CSONObject().put("index", i ).put("data", i));
+        }
+        collection.commit();
+    }
+
+    @Test
     public void indexMapFindAscTest() throws IOException {
         File dbFile = new File("indexMapFindTest.db");
         IdxDB idxDB = IdxDB.newMaker(dbFile).make();

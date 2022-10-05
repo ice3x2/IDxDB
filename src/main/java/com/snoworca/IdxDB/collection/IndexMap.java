@@ -2,6 +2,7 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.util.CusLinkedHashMap;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
@@ -12,14 +13,16 @@ public class IndexMap extends IndexCollectionBase {
 
 
 
-    private AccessOrderCtrlLinkedHashMap<Object, CSONItem> itemHashMap;
-    private AccessOrderCtrlLinkedHashMap<Object, CSONItem> itemHashCacheMap;
+    private CusLinkedHashMap<Object, CSONItem> itemHashMap;
+    private CusLinkedHashMap<Object,CSONItem> itemHashCacheMap;
 
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
     private static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
 
     private boolean isAccessOrder;
     private boolean isChangeOrder = false;
+    private int memCacheSize = 0;
+    private boolean isReverse = false;
 
     public IndexMap(DataIO dataIO, IndexMapOption collectionOption) {
         super(dataIO, collectionOption);
@@ -29,8 +32,10 @@ public class IndexMap extends IndexCollectionBase {
     @Override
     protected void onInit(CollectionOption collectionOption) {
         isAccessOrder = ((IndexMapOption)collectionOption).isAccessOrder();
-        itemHashMap = new AccessOrderCtrlLinkedHashMap<>(isAccessOrder);
-        itemHashCacheMap = new AccessOrderCtrlLinkedHashMap<>(isAccessOrder);
+        itemHashMap = new CusLinkedHashMap<>(isAccessOrder);
+        itemHashCacheMap = new CusLinkedHashMap<>(isAccessOrder);
+        memCacheSize = collectionOption.getMemCacheSize();
+        isReverse = collectionOption.getIndexSort() < 0;
     }
 
     @Override
@@ -40,9 +45,43 @@ public class IndexMap extends IndexCollectionBase {
     }
 
     private CSONItem get(Object indexValue) {
-        CSONItem csonItem = itemHashMap_.get(indexValue);
-
+        CSONItem csonItem = itemHashMap.get(indexValue);
+        if(memCacheSize > 0 && isAccessOrder && csonItem != null) {
+           addCache(memCacheSize, csonItem);
+        }
         return csonItem;
+    }
+
+
+    private void removeCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return;
+        itemHashCacheMap.remove(item.getIndexValue());
+        int cacheMapSize = itemHashCacheMap.size();
+        Collection<CSONItem> items = itemHashMap.values(isReverse);
+        Iterator<CSONItem> iterator = items.iterator();
+        int count = 0;
+        while(iterator.hasNext() && count < cacheMapSize) {
+            iterator.next();
+            cacheMapSize++;
+        }
+        while(iterator.hasNext() && itemHashCacheMap.size() < memCacheSize) {
+            CSONItem csonItem = iterator.next();
+            itemHashCacheMap.put(csonItem.getIndexValue(), csonItem);
+            csonItem.setStore(false);
+        }
+    }
+
+
+    private void addCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return;
+        itemHashCacheMap.put(item.getIndexValue(), item);
+        if(itemHashCacheMap.size() > memCacheSize) {
+            Iterator<Map.Entry<Object,CSONItem>> iterator = itemHashCacheMap.entrySet(!isReverse).iterator();
+            Map.Entry<Object, CSONItem> entry = iterator.next();
+            entry.getValue().setStore(true);
+            iterator.remove();
+        }
+
     }
 
 
@@ -150,7 +189,7 @@ public class IndexMap extends IndexCollectionBase {
         try {
             switch (op) {
                 case eq:
-                    CSONItem csonItem = itemHashMap_.get(indexValue);
+                    CSONItem csonItem = itemHashMap.getNoneOrder(indexValue);
                     if (csonItem != null) removeTransactionOrder(csonItem.getCsonObject());
                     break;
             }
@@ -232,6 +271,7 @@ public class IndexMap extends IndexCollectionBase {
                             Object indexValueOfRemove = item.getIndexValue();
                             if ((item = itemHashMap.remove(indexValueOfRemove)) != null) {
                                 commitResult.incrementCountOfRemove();
+                                removeCache(memCacheSize, item);
                                 unlink(item);
                                 item.release();
                             }
@@ -242,14 +282,16 @@ public class IndexMap extends IndexCollectionBase {
                                 clearItem.release();
                                 commitResult.incrementCountOfRemove();
                             }
+                            itemHashCacheMap.clear();
                             itemHashMap.clear();
                             break;
                         case TransactionOrder.ORDER_ADD:
                         case TransactionOrder.ORDER_ADD_OR_REPLACE:
                             CSONObject addOrReplaceCsonObject = item.getCsonObject();
                             Object indexValueForAddOrReplace = item.getIndexValue();
-                            CSONItem foundItemOfAddOrReplace = itemHashMap.get(indexValueForAddOrReplace);
+                            CSONItem foundItemOfAddOrReplace = itemHashMap.getAndAccessOrder(indexValueForAddOrReplace);
                             if (foundItemOfAddOrReplace == null) {
+                                foundItemOfAddOrReplace = item;
                                 itemHashMap.put(indexValueForAddOrReplace, item);
                                 item.storeIfNeed();
                                 commitResult.incrementCountOfAdd();
@@ -260,17 +302,19 @@ public class IndexMap extends IndexCollectionBase {
                                 foundItemOfAddOrReplace.storeIfNeed();
                                 commitResult.incrementCountOfReplace();
                             }
+                            addCache(memCacheSize, foundItemOfAddOrReplace);
                             break;
                         case TransactionOrder.ORDER_REPLACE:
                             CSONObject replaceCsonObject = item.getCsonObject();
                             Object indexValueForReplace = item.getIndexValue();
-                            CSONItem foundItemOfReplace = itemHashMap.get(indexValueForReplace);
+                            CSONItem foundItemOfReplace = itemHashMap.getAndAccessOrder(indexValueForReplace);
                             if (foundItemOfReplace != null) {
                                 unlink(foundItemOfReplace);
                                 foundItemOfReplace.setStoragePos(-1);
                                 foundItemOfReplace.setCsonObject(replaceCsonObject);
                                 foundItemOfReplace.storeIfNeed();
                                 commitResult.incrementCountOfReplace();
+                                addCache(memCacheSize, foundItemOfReplace);
                             }
                             break;
                     }
@@ -280,7 +324,7 @@ public class IndexMap extends IndexCollectionBase {
             }
 
             isChangeOrder = false;
-            onMemStore();
+            //onMemStore();
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -303,19 +347,6 @@ public class IndexMap extends IndexCollectionBase {
     }
 
 
-    private class AccessOrderCtrlLinkedHashMap<K,E> extends LinkedHashMap<K,E> {
-        AccessOrderCtrlLinkedHashMap(boolean accessOrder) {
-            super(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, accessOrder);
-        }
-
-        public E getNoneOrder(Object key) {
-            boolean defaultAccessOrder = isAccessOrder;
-            isAccessOrder = false;
-            E e = super.get(key);
-            isAccessOrder = defaultAccessOrder;
-            return e;
-        }
-    }
 
     @Override
     public Iterator<CSONObject> iterator() {
