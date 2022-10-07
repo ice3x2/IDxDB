@@ -26,7 +26,7 @@ public class QueryExecutor {
             return makeErrorCSONObject("No object of 'argument' in query method '" + method + "'.");
         }
         try {
-            if ("newIndexSet".equalsIgnoreCase(method) || "newIndexMap".equalsIgnoreCase(method)) {
+            if ("newIndexTreeSet".equalsIgnoreCase(method) || "newIndexLinkedMap".equalsIgnoreCase(method)) {
                 return executeNewCollectionMethod(idxDB,method, argument);
             }
             else if ("dropCollection".equalsIgnoreCase(method)) {
@@ -72,13 +72,13 @@ public class QueryExecutor {
         int memCacheSize = index.optInteger("memCacheSize", 1000);
         boolean isFileStore = index.optBoolean("fileStore", true);
         boolean accessOrder = index.optBoolean("accessOrder", false);
-        if("newIndexSet".equalsIgnoreCase(method)) {
-            IndexSetBuilder indexSetBuilder = store.newIndexSetBuilder(name);
+        if("newIndexTreeSet".equalsIgnoreCase(method)) {
+            IndexSetBuilder indexSetBuilder = store. newIndexTreeSetBuilder(name);
             indexSetBuilder.index(firstIndexKey, sortMethod);
             indexSetBuilder.memCacheSize(memCacheSize);
             indexSetBuilder.setFileStore(isFileStore);
             indexSetBuilder.create();
-        } else if("newIndexMap".equalsIgnoreCase(method)) {
+        } else if("newIndexLinkedMap".equalsIgnoreCase(method)) {
             IndexMapBuilder indexMapBuilder = store.newIndexMapBuilder(name);
             indexMapBuilder.index(firstIndexKey, sortMethod);
             indexMapBuilder.memCacheSize(memCacheSize);

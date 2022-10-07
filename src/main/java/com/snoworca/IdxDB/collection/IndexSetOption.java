@@ -5,7 +5,7 @@ import com.snoworca.cson.CSONObject;
 public class IndexSetOption extends CollectionOption {
 
     public IndexSetOption(String collectionName) {
-        super(IndexSet.class.getName(), collectionName);
+        super(IndexTreeSet.class.getName(), collectionName);
     }
     public void setFileStore(boolean fileStoreEnable) {
         toCsonObject().put("fileStore", fileStoreEnable);

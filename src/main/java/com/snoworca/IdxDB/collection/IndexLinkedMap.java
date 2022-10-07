@@ -8,7 +8,7 @@ import com.snoworca.cson.CSONObject;
 import java.io.IOException;
 import java.util.*;
 
-public class IndexMap extends IndexCollectionBase {
+public class IndexLinkedMap extends IndexCollectionBase {
 
 
 
@@ -23,7 +23,7 @@ public class IndexMap extends IndexCollectionBase {
     private int memCacheSize;
     private boolean isReverse;
 
-    public IndexMap(DataIO dataIO, IndexMapOption collectionOption) {
+    public IndexLinkedMap(DataIO dataIO, IndexMapOption collectionOption) {
         super(dataIO, collectionOption);
 
     }

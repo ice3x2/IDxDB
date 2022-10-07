@@ -46,12 +46,12 @@ public class IndexMapBuilder {
         return this;
     }
 
-    public IndexMap create() {
-        IndexMap indexMap = new IndexMap(dataIO, indexMapOption);
+    public IndexLinkedMap create() {
+        IndexLinkedMap indexLinkedMap = new IndexLinkedMap(dataIO, indexMapOption);
         createLock.lock();
-        this.callback.onCreate(indexMap);
+        this.callback.onCreate(indexLinkedMap);
         createLock.unlock();
-        return indexMap;
+        return indexLinkedMap;
     }
 
 

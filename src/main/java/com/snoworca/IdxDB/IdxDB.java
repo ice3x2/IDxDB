@@ -80,12 +80,12 @@ public class IdxDB {
                 CSONObject csonObject = new CSONObject(buffer);
                 String name = csonObject.getString("name");
                 db.indexCollectionInfoStorePosMap.put(name, dataBlock.getPos());
-                if(IndexSet.class.getName().equals(csonObject.getString("className"))) {
-                    IndexSet indexSet = new IndexSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexSet.getName(), indexSet);
-                } else if(IndexMap.class.getName().equals(csonObject.getString("className"))) {
-                    IndexMap indexMap = new IndexMap(db.dataIO, IndexMapOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexMap.getName(), indexMap);
+                if(IndexTreeSet.class.getName().equals(csonObject.getString("className"))) {
+                    IndexTreeSet indexTreeSet = new IndexTreeSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
+                    db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
+                } else if(IndexLinkedMap.class.getName().equals(csonObject.getString("className"))) {
+                    IndexLinkedMap indexLinkedMap = new IndexLinkedMap(db.dataIO, IndexMapOption.fromCSONObject(csonObject));
+                    db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
                 }
             }
 
@@ -171,7 +171,7 @@ public class IdxDB {
 
 
 
-    public IndexSetBuilder newIndexSetBuilder(String name) {
+    public IndexSetBuilder  newIndexTreeSetBuilder(String name) {
 
 
         return new IndexSetBuilder(makeCollectionCreateCallback(name), dataIO,name, collectionMutableLock);

@@ -5,7 +5,7 @@ import com.snoworca.cson.CSONObject;
 public class IndexMapOption extends CollectionOption {
 
     public IndexMapOption(String collectionName) {
-        super(IndexMap.class.getName(), collectionName);
+        super(IndexLinkedMap.class.getName(), collectionName);
     }
 
     public static IndexMapOption fromCSONObject(CSONObject csonObject) {

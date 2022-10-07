@@ -17,8 +17,8 @@ public class IndexMemCacheOptionTest {
         File dbFile = new File("indexMemCacheTest.db");
         dbFile.delete();
         IdxDB idxDB = IdxDB.newMaker(dbFile).make();
-        IndexCollection collectionMemCache = idxDB.newIndexSetBuilder("memCacheIndex").index("key", 1).memCacheSize(3000).setMemCacheIndex(true).create();
-        IndexCollection collectionNoCache = idxDB.newIndexSetBuilder("noCacheIndex").index("key", 1).memCacheSize(3000).setMemCacheIndex(false).create();
+        IndexCollection collectionMemCache = idxDB. newIndexTreeSetBuilder("memCacheIndex").index("key", 1).memCacheSize(3000).setMemCacheIndex(true).create();
+        IndexCollection collectionNoCache = idxDB. newIndexTreeSetBuilder("noCacheIndex").index("key", 1).memCacheSize(3000).setMemCacheIndex(false).create();
 
         for(int i = 0; i < 1000; ++i) {
             collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));

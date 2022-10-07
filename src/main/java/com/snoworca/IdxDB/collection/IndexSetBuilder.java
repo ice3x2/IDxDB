@@ -54,12 +54,12 @@ public class IndexSetBuilder {
 
 
 
-    public IndexSet create() {
-        IndexSet indexSet = new IndexSet(dataIO, indexSetOption);
+    public IndexTreeSet create() {
+        IndexTreeSet indexTreeSet = new IndexTreeSet(dataIO, indexSetOption);
         createLock.lock();
-        this.callback.onCreate(indexSet);
+        this.callback.onCreate(indexTreeSet);
         createLock.unlock();
-        return indexSet;
+        return indexTreeSet;
     }
 
 }
