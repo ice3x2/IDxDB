@@ -2,8 +2,8 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
-import com.snoworca.IdxDB.collection.IndexMap;
-import com.snoworca.IdxDB.collection.IndexSet;
+import com.snoworca.IdxDB.collection.IndexLinkedMap;
+import com.snoworca.IdxDB.collection.IndexTreeSet;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ class IdxDBTest {
         File file = new File("memCache.db");
         file.delete();
         IdxDB idxDB = IdxDB.newMaker(file).make();
-        IndexSet set = idxDB.newIndexSetBuilder("208300").index("dateL", 1).memCacheSize(1000).create();
+        IndexTreeSet set = idxDB. newIndexTreeSetBuilder("208300").index("dateL", 1).memCacheSize(1000).create();
 
 
         ArrayList<CSONObject> testDatas = new ArrayList<>();
@@ -84,7 +84,7 @@ class IdxDBTest {
             } else if(k == 6) {
                 indexCollection = idxDB.newIndexMapBuilder(k +"").memCacheSize(memCacheSize).setAccessOrder(true).index("date" , -1).create();
             } else {
-                indexCollection = idxDB.newIndexSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
+                indexCollection = idxDB. newIndexTreeSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
             }
 
             for(int i = 0; i < rowSize; ++i) {
@@ -159,31 +159,31 @@ class IdxDBTest {
 
         //indexCollection.findByIndex(5, FindOption)
 
-        IndexMap indexMap = (IndexMap)idxDB.get("5");
-        CSONObject result = indexMap.findOneByIndex(1);
+        IndexLinkedMap indexLinkedMap = (IndexLinkedMap)idxDB.get("5");
+        CSONObject result = indexLinkedMap.findOneByIndex(1);
         assertEquals(result.optString("str"), "1");
 
 
         start = System.currentTimeMillis();
-        List<CSONObject>  list = indexMap.list(1000, false);
+        List<CSONObject>  list = indexLinkedMap.list(1000, false);
         System.out.println((System.currentTimeMillis() - start) + "ms");
 
         start = System.currentTimeMillis();
-        list = indexMap.list(1000, true);
+        list = indexLinkedMap.list(1000, true);
         System.out.println((System.currentTimeMillis() - start) + "ms");
 
 
-        indexMap = (IndexMap)idxDB.get("6");
-        result = indexMap.findOneByIndex(5000);
+        indexLinkedMap = (IndexLinkedMap)idxDB.get("6");
+        result = indexLinkedMap.findOneByIndex(5000);
         assertEquals(result.optString("str"), "5000");
-        result = indexMap.findOneByIndex(4000);
-        result = indexMap.findOneByIndex(3000);
-        result = indexMap.findOneByIndex(2000);
-        indexMap.commit();
+        result = indexLinkedMap.findOneByIndex(4000);
+        result = indexLinkedMap.findOneByIndex(3000);
+        result = indexLinkedMap.findOneByIndex(2000);
+        indexLinkedMap.commit();
 
 
         start = System.currentTimeMillis();
-        list = indexMap.list(1000, false);
+        list = indexLinkedMap.list(1000, false);
         assertTrue((System.currentTimeMillis() - start) < 2);
         assertEquals("2000",list.get(0).get("str"));
         assertEquals("3000",list.get(1).get("str"));
@@ -207,7 +207,7 @@ class IdxDBTest {
         CSONObject resultQuery = null;
 
         // 이름 없음 에러
-        CSONObject createSetErrorQueryNoName = new CSONObject().put("method", "newIndexSet").put("argument",new CSONObject().put("index", new CSONObject().put("dateL", -1)).put("memCacheSize", 1000));
+        CSONObject createSetErrorQueryNoName = new CSONObject().put("method", "newIndexTreeSet").put("argument",new CSONObject().put("index", new CSONObject().put("dateL", -1)).put("memCacheSize", 1000));
         resultQuery = idxDB.executeCSONQuery(createSetErrorQueryNoName);
         System.out.print("이름 없음: ");
         System.out.println(resultQuery);
@@ -215,7 +215,7 @@ class IdxDBTest {
 
 
         // 인덱스가 없음 에러.
-        CSONObject createSetErrorQueryNoIndex = new CSONObject().put("method", "newIndexSet").put("argument",new CSONObject().put("name", "201120").put("memCacheSize", 1000).put("index", new CSONObject()));
+        CSONObject createSetErrorQueryNoIndex = new CSONObject().put("method", "newIndexTreeSet").put("argument",new CSONObject().put("name", "201120").put("memCacheSize", 1000).put("index", new CSONObject()));
         resultQuery = idxDB.executeCSONQuery(createSetErrorQueryNoIndex);
         System.out.print("인덱스가 없음: ");
         System.out.println(resultQuery);
@@ -223,7 +223,7 @@ class IdxDBTest {
 
 
         // 정상 생성
-        CSONObject createSetQuery = new CSONObject().put("method", "newIndexSet").put("argument",new CSONObject().put("name", "201120").put("index", new CSONObject().put("dateL", -1)).put("memCacheSize", 1000));
+        CSONObject createSetQuery = new CSONObject().put("method", "newIndexTreeSet").put("argument",new CSONObject().put("name", "201120").put("index", new CSONObject().put("dateL", -1)).put("memCacheSize", 1000));
         resultQuery = idxDB.executeCSONQuery(createSetQuery);
         System.out.print("생성 성공: ");
         System.out.println(resultQuery);
@@ -398,12 +398,6 @@ class IdxDBTest {
 
 
         file.delete();
-
-
-
-
-
-
 
 
     }

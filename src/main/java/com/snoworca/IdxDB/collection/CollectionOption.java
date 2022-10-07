@@ -48,6 +48,15 @@ public class CollectionOption {
     }
 
 
+    public void setMemCacheIndex(boolean enable) {
+        toCsonObject().put("memCacheIndex", enable);
+    }
+
+    public boolean isMemCacheIndex() {
+        return toCsonObject().optBoolean("memCacheIndex", true);
+    }
+
+
 
     public CSONObject toCsonObject() {
         return this.option;

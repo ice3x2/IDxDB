@@ -31,7 +31,7 @@ class DataIOTest {
 
     @Test
     void zeroPosBugTest() throws IOException {
-        File file = new File("./testdata112.dat");
+        File file = new File("./zeroPosBugTest.dat");
         file.delete();
         DataIO dataIO = new DataIO(file);
         dataIO.open();
@@ -46,6 +46,7 @@ class DataIOTest {
 
         DataBlock dataBlock = dataIO.get(0);
         assertEquals(dataBlock.getHeader().getNext(), posOne);
+        file.delete();
 
 
     }

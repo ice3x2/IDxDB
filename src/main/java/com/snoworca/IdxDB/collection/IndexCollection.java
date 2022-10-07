@@ -27,7 +27,8 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     public CSONObject findOneByIndex(Object index);
 
-    public void removeByIndex(Object start, FindOption options);
+    public void removeByIndex(Object indexValue);
+    public void removeByIndex(Object indexValue, FindOption options);
 
     public List<CSONObject> list(int limit,boolean reverse);
 

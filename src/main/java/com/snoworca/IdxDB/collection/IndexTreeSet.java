@@ -3,28 +3,29 @@ package com.snoworca.IdxDB.collection;
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.dataStore.DataIO;
-import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
 import java.util.*;
 
-public class IndexSet extends IndexCollectionBase {
+public class IndexTreeSet extends IndexCollectionBase {
 
     private TreeSet<CSONItem> itemSet;
+    private TreeSet<CSONItem> cacheSet;
 
     private StoreDelegator storeDelegator;
     private String indexKey;
     private int indexSort;
 
+    private boolean isMemCacheIndex;
 
 
-
-    public IndexSet(DataIO dataIO, IndexSetOption option) {
+    public IndexTreeSet(DataIO dataIO, IndexSetOption option) {
         super(dataIO, option);
         this.indexKey = super.getIndexKey();
         this.storeDelegator = super.getStoreDelegator();
         this.indexSort = super.getSort();
+        this.isMemCacheIndex = option.isMemCacheIndex();
 
 
     }
@@ -33,6 +34,7 @@ public class IndexSet extends IndexCollectionBase {
     @Override
     protected void onInit(CollectionOption collectionOption) {
         itemSet = new TreeSet<>();
+        cacheSet = new TreeSet<>();
     }
 
     @Override
@@ -55,7 +57,11 @@ public class IndexSet extends IndexCollectionBase {
                 csonItem.setStoragePos(-1);
             }
             csonItem.storeIfNeed();
-            csonItem.setStore(count > memCacheLimit);
+            boolean isMemCache = count > memCacheLimit;
+            csonItem.setStore(isMemCache);
+            if(isMemCache) {
+                cacheSet.add(csonItem);
+            }
             ++count;
         }
     }
@@ -70,12 +76,38 @@ public class IndexSet extends IndexCollectionBase {
 
 
 
+    private void removeCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return;
+        cacheSet.remove(item);
+        Set<CSONItem> subSet = cacheSet.isEmpty() ? itemSet : itemSet.tailSet(cacheSet.last(), false);
+        Iterator<CSONItem> iterator = subSet.iterator();
+        while(iterator.hasNext() && cacheSet.size() < memCacheSize) {
+            CSONItem csonItem = iterator.next();
+            cacheSet.add(csonItem);
+            csonItem.setStore(false);
+        }
+    }
+
+
+    private void addCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return;
+        cacheSet.add(item);
+        if (cacheSet.size() > memCacheSize) {
+            CSONItem csonItem = cacheSet.pollLast();
+            if(csonItem != null) {
+                csonItem.setStore(true);
+            }
+        }
+    }
+
+
     @Override
     public synchronized CommitResult commit() {
 
         ArrayList<TransactionOrder> transactionOrders = getTransactionOrders();
         writeLock();
         CommitResult commitResult = new CommitResult();
+        int memCacheSize = getMemCacheSize();
         try {
             if(transactionOrders.isEmpty()) {
                 return commitResult;
@@ -86,7 +118,10 @@ public class IndexSet extends IndexCollectionBase {
                 CSONItem item = transactionOrder.getItem();
                 switch (transactionOrder.getOrder()) {
                     case TransactionOrder.ORDER_ADD:
-                        if(itemSet.add(item)) commitResult.incrementCountOfAdd();
+                        if(itemSet.add(item)) {
+                            addCache(memCacheSize, item);
+                            commitResult.incrementCountOfAdd();
+                        }
                         item.storeIfNeed();
                         indexChanged = true;
                     break;
@@ -96,6 +131,7 @@ public class IndexSet extends IndexCollectionBase {
                             if(realItem != null) item = realItem;
                         }
                         if(itemSet.remove(item)) {
+                            removeCache(memCacheSize, item);
                             commitResult.incrementCountOfRemove();
                         }
                         unlink(item);
@@ -108,6 +144,7 @@ public class IndexSet extends IndexCollectionBase {
                             clearItem.release();
                             commitResult.incrementCountOfRemove();
                         }
+                        cacheSet.clear();
                         itemSet.clear();
                     break;
                     case TransactionOrder.ORDER_ADD_OR_REPLACE:
@@ -115,6 +152,7 @@ public class IndexSet extends IndexCollectionBase {
                         CSONItem foundItemOfAddOrReplace = get_(addOrReplaceCsonObject);
                         if(foundItemOfAddOrReplace == null) {
                             itemSet.add(item);
+                            addCache(memCacheSize, item);
                             item.storeIfNeed();
                             commitResult.incrementCountOfAdd();
                         } else {
@@ -130,7 +168,6 @@ public class IndexSet extends IndexCollectionBase {
                             foundItemOfAddOrReplace.storeIfNeed();
                             commitResult.incrementCountOfReplace();
                         }
-
                     break;
                     case TransactionOrder.ORDER_REPLACE:
                         CSONObject replaceCsonObject = item.getCsonObject();
@@ -151,8 +188,8 @@ public class IndexSet extends IndexCollectionBase {
                     break;
                 }
             }
+            //onMemStore();
 
-            onMemStore();
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -176,7 +213,7 @@ public class IndexSet extends IndexCollectionBase {
 
     private CSONItem get_(CSONObject csonObject) {
         String indexKey = getIndexKey();
-        CSONItem item = new CSONItem(getStoreDelegator(),csonObject,indexKey, getSort());
+        CSONItem item = new CSONItem(getStoreDelegator(),csonObject,indexKey, getSort(), isMemCacheIndex );
         CSONItem foundItem = itemSet.floor(item);
         if(foundItem == null || !CompareUtil.compare(foundItem.getIndexValue(), csonObject.opt(indexKey), OP.eq)) {
             return null;
@@ -306,7 +343,7 @@ public class IndexSet extends IndexCollectionBase {
 
     private CSONItem makeIndexItem(Object index) {
         CSONObject indexJson = new CSONObject().put(indexKey, index);
-        CSONItem indexItem = new CSONItem(storeDelegator,indexJson, indexKey, indexSort);
+        CSONItem indexItem = new CSONItem(storeDelegator,indexJson, indexKey, indexSort, isMemCacheIndex);
         return indexItem;
     }
 
@@ -337,9 +374,9 @@ public class IndexSet extends IndexCollectionBase {
         ArrayList<CSONItem> list = new ArrayList<>();
         for(Object obj : c) {
             if(obj instanceof CSONObject) {
-                list.add(new CSONItem(storeDelegator,(CSONObject) obj, indexKey, indexSort));
+                list.add(new CSONItem(storeDelegator,(CSONObject) obj, indexKey, indexSort, isMemCacheIndex));
             } else {
-                list.add(new CSONItem(storeDelegator,new CSONObject().put(indexKey, obj), indexKey, indexSort));
+                list.add(new CSONItem(storeDelegator,new CSONObject().put(indexKey, obj), indexKey, indexSort, isMemCacheIndex));
             }
         }
         return list;
@@ -393,6 +430,7 @@ public class IndexSet extends IndexCollectionBase {
                 try {
                     finalIterator.remove();
                     if (current != null) {
+                        cacheSet.remove(current);
                         unlink(current);
                     }
                 } catch (IOException e) {

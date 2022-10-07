@@ -101,7 +101,7 @@ public class DataBlock {
     }
 
     public byte[] toBuffer() {
-        byte[] buffer = new byte[DataBlockHeader.HEADER_SIZE +  header.getLength()];
+        byte[] buffer = new byte[DataBlockHeader.HEADER_SIZE + header.getLength()];
         header.writeBuffer(buffer);
         System.arraycopy(data, 0, buffer, DataBlockHeader.HEADER_SIZE, data.length);
         return buffer;

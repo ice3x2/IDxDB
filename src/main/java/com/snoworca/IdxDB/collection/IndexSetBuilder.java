@@ -21,6 +21,8 @@ public class IndexSetBuilder {
     }
 
 
+
+
     IndexSetBuilder(String name, DataIO dataIO) {
         indexSetOption = new IndexSetOption(name);
     }
@@ -43,12 +45,21 @@ public class IndexSetBuilder {
         return this;
     }
 
-    public IndexSet create() {
-        IndexSet indexSet = new IndexSet(dataIO, indexSetOption);
+
+    public IndexSetBuilder setMemCacheIndex(boolean enable) {
+        indexSetOption.setMemCacheIndex(enable);
+        return this;
+    }
+
+
+
+
+    public IndexTreeSet create() {
+        IndexTreeSet indexTreeSet = new IndexTreeSet(dataIO, indexSetOption);
         createLock.lock();
-        this.callback.onCreate(indexSet);
+        this.callback.onCreate(indexTreeSet);
         createLock.unlock();
-        return indexSet;
+        return indexTreeSet;
     }
 
 }
