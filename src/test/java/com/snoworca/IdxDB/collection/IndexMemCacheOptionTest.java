@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.IOException;
 
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class IndexMemCacheOptionTest {
@@ -72,8 +73,8 @@ public class IndexMemCacheOptionTest {
         IndexCollection collectionNoCache = idxDB.newIndexMapBuilder("noCacheIndex").index("key", 1).memCacheSize(100).setMemCacheIndex(false).create();
 
         for(int i = 0; i < 1000; ++i) {
-            collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));
-            collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i));
+            collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i).put("str","sdafjkasdklfjasdklfjasdlfk;jasdlfk;jasdfkl;asdfjasdl;fkhjasdj;dfasjklf"));
+            collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i).put("str","sdafjkasdklfjasdklfjasdlfk;jasdlfk;jasdfkl;asdfjasdl;fkhjasdj;dfasjklf"));
         }
         collectionMemCache.commit();
         collectionNoCache.commit();
@@ -81,26 +82,36 @@ public class IndexMemCacheOptionTest {
 
         long start = System.currentTimeMillis();
         for(int i = 50000; i < 100000; ++i) {
-            collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));
+            collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i).put("str","1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;"));
             collectionMemCache.commit();
         }
         collectionMemCache.removeByIndex("1");
         collectionMemCache.removeByIndex("50000");
         collectionMemCache.removeByIndex("100000");
+
         collectionMemCache.commit();
+
+        for(int i = 1; i < 100000; ++i) {
+            collectionMemCache.findOneByIndex(i + "");
+        }
 
         long timeLap1 = System.currentTimeMillis() - start + 1;
         System.out.println("인덱스 값 메모리 캐쉬:" + timeLap1 + "ms");
 
         start = System.currentTimeMillis();
         for(int i = 50000; i < 100000; ++i) {
-            collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i));
+            collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i).put("str","1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;asdfjasdflkjsdfklasdjflasd;fjasdl;fjasdfjl;asdfjl;"));
             collectionNoCache.commit();
         }
-        collectionMemCache.removeByIndex("1");
-        collectionMemCache.removeByIndex("50000");
-        collectionMemCache.removeByIndex("100000");
-        collectionMemCache.commit();
+        collectionNoCache.removeByIndex("1");
+        collectionNoCache.removeByIndex("50000");
+        collectionNoCache.removeByIndex("100000");
+        collectionNoCache.commit();
+
+        for(int i = 1; i < 100000; ++i) {
+            collectionNoCache.findOneByIndex(i + "");
+        }
+
         long timeLap2 = System.currentTimeMillis() - start + 1;
         System.out.println("인덱스 값 노 캐쉬:"+ timeLap2 + "ms");
 
@@ -109,7 +120,7 @@ public class IndexMemCacheOptionTest {
 
         System.out.println("인덱스 값 메모리 캐쉬:" + timeLap1 + "ms");
 
-        assertTrue(timeLap2 > ( timeLap1 * 1.1));
+        assertTrue(timeLap2 >  timeLap1);
         dbFile.delete();
     }
 }

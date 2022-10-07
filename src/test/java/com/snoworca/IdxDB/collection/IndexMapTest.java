@@ -22,6 +22,12 @@ class IndexMapTest {
             collection.add(new CSONObject().put("index", i ).put("data", i));
         }
         collection.commit();
+        assertEquals(1000, collection.size());
+        for(int i = 999; i >= 0; --i) {
+            collection.remove(new CSONObject().put("index", i ).put("data", i));
+        }
+        collection.commit();
+        assertEquals(0, collection.size());
     }
 
     @Test
