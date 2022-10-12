@@ -205,6 +205,12 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
     @Override
     public List<CSONObject> list(int limit, boolean reverse) {
+        return list(0, limit, reverse);
+
+    }
+
+    @Override
+    public List<CSONObject> list(int start, int limit, boolean reverse) {
         boolean asc = getSort() > -1;
         try {
             readLock();
@@ -213,22 +219,24 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
                 ArrayList<CSONItem> arrayList = new ArrayList<>(itemHashMap_.values());
                 Collections.reverse(arrayList);
-                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(arrayList, limit);
+                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,arrayList, limit);
                 return result;
             }
-            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemHashMap_.values(), limit);
+            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,itemHashMap_.values(), limit);
             return result;
         } finally {
             readUnlock();
         }
-
     }
 
-    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<CSONItem> CSONItems, int limit) {
+    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(int start,Collection<CSONItem> CSONItems, int limit) {
         int count = 0;
         ArrayList<CSONObject> csonObjects = new ArrayList<>();
         if(CSONItems instanceof ArrayList) {
             for(int i = 0, n = CSONItems.size(); i < n; ++i) {
+                if(i < start) {
+                    continue;
+                }
                 CSONItem item = ((ArrayList<CSONItem>) CSONItems).get(i);
                 if(count >= limit) {
                     break;
@@ -237,7 +245,12 @@ public class IndexLinkedMap extends IndexCollectionBase {
                 ++count;
             }
         } else {
+            int continueIdx = 0;
             for(CSONItem item : CSONItems) {
+                if(continueIdx < start) {
+                    ++continueIdx;
+                    continue;
+                }
                 if(count >= limit) {
                     break;
                 }

@@ -13,7 +13,7 @@ public class DataBlockHeaderTest {
 
     @Test
     public void dataHeaderParsingTest() {
-        DataBlockHeader.setTopID(123123132L);
+
         DataBlockHeader dataHeader = new DataBlockHeader(DataType.TYPE_DOUBLE, 8);
         byte[] buffer = new byte[DataBlockHeader.HEADER_SIZE];
         dataHeader.writeBuffer(buffer);
@@ -22,14 +22,13 @@ public class DataBlockHeaderTest {
 
         DataBlockHeader distDataHeader = DataBlockHeader.fromByteBuffer(headerByteBuffer);
 
-        assertEquals(distDataHeader.getID(), dataHeader.getID());
         assertEquals(distDataHeader.getLength(), 8);
         assertEquals(distDataHeader.getType(), DataType.TYPE_DOUBLE);
     }
 
     @Test
     public void dataBlockParseExceptionTest() {
-        DataBlockHeader.setTopID(45656792L);
+
         boolean isFail = false;
         try {
             new DataBlockHeader(DataType.TYPE_DOUBLE, 1230);

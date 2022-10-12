@@ -296,7 +296,7 @@ class IdxDBTest {
         System.out.print("addOrReplaceAllQuery: ");
         System.out.println(resultQuery);
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",30).put("where",new CSONObject().put("dateL",50).put("$op", "gte")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",30).put("where",new CSONObject().put("dateL",50).put("$op", "gte")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find gte(50), limit(30): ");
         System.out.println(resultQuery);
@@ -306,7 +306,7 @@ class IdxDBTest {
         assertEquals(resultData.getObject(29).getInt("dateL"), 79);
 
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",5).put("where",new CSONObject().put("dateL",50).put("$op", "gt")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",5).put("where",new CSONObject().put("dateL",50).put("$op", "gt")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find gt(50), limit(5): ");
         System.out.println(resultQuery);
@@ -316,7 +316,7 @@ class IdxDBTest {
         assertEquals(resultData.getObject(4).getInt("dateL"), 55);
 
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",7).put("where",new CSONObject().put("dateL",10).put("$op", "lte")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",7).put("where",new CSONObject().put("dateL",10).put("$op", "lte")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find lte(10), limit(7): ");
         System.out.println(resultQuery);
@@ -326,7 +326,7 @@ class IdxDBTest {
         assertEquals(resultData.getObject(6).getInt("dateL"), 4);
 
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",100000).put("where",new CSONObject().put("dateL",30).put("$op", "lt")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",100000).put("where",new CSONObject().put("dateL",30).put("$op", "lt")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find lt(30), limit(100000): ");
         System.out.println(resultQuery);

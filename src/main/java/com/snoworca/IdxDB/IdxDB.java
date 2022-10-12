@@ -1,10 +1,11 @@
 package com.snoworca.IdxDB;
 
-import com.snoworca.IdxDB.collection.*;
 
 import com.snoworca.IdxDB.dataStore.DataBlock;
+
 import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.IdxDB.dataStore.DataIOConfig;
+import com.snoworca.IdxDB.collection.*;
 import com.snoworca.cson.CSONObject;
 
 import java.io.File;
@@ -171,7 +172,7 @@ public class IdxDB {
 
 
 
-    public IndexSetBuilder  newIndexTreeSetBuilder(String name) {
+    public IndexSetBuilder newIndexTreeSetBuilder(String name) {
 
 
         return new IndexSetBuilder(makeCollectionCreateCallback(name), dataIO,name, collectionMutableLock);

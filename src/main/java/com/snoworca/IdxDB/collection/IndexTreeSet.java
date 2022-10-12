@@ -242,11 +242,11 @@ public class IndexTreeSet extends IndexCollectionBase {
             case gt:
                 if(indexSort > 0) {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
                     readUnlock();;
                 } else {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
                     readUnlock();
                 }
                 break;
@@ -254,11 +254,11 @@ public class IndexTreeSet extends IndexCollectionBase {
             case lt:
                 if(indexSort > 0) {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
                     readUnlock();
                 } else {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
                     readUnlock();
                 }
                 break;
@@ -304,24 +304,33 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     @Override
     public List<CSONObject> list(int limit, boolean reverse) {
+        return list(0, limit, reverse);
+    }
+
+    @Override
+    public List<CSONObject> list(int start, int limit, boolean reverse) {
         try {
             readLock();
             if (reverse) {
-                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet(), limit);
+                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,itemSet.descendingSet(), limit);
                 return result;
             }
-            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet, limit);
+            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,itemSet, limit);
             return result;
         } finally {
             readUnlock();
         }
-
     }
 
-    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<CSONItem> CSONItems, int limit) {
+    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(int start, Collection<CSONItem> CSONItems, int limit) {
         int count = 0;
+        int continueIdx = 0;
         ArrayList<CSONObject> csonObjects = new ArrayList<>();
         for(CSONItem item : CSONItems) {
+            if(continueIdx < start) {
+                continueIdx++;
+                continue;
+            }
             if(count >= limit) {
                 break;
             }

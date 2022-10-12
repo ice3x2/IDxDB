@@ -4,9 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class CusLinkedHashMapTest {
 

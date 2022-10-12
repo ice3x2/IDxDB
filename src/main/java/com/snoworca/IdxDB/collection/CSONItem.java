@@ -4,7 +4,6 @@ import com.snoworca.IdxDB.exception.MissingIndexValueException;
 import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 class CSONItem implements Comparable<CSONItem> {

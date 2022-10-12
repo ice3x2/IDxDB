@@ -7,23 +7,20 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class DataBlockHeader {
-    private final static AtomicLong TOP_ID = new AtomicLong(0);
 
-    // prefix(1), id(8), type(1), len(4), prev(8), next(8)
-    final static int HEADER_SIZE = 1 + 8 + 1 +4 + 8 + 8;
+    // prefix(1) type(1), len(4), prev(8), next(8)
+    final static int HEADER_SIZE = 1 + 1 +4 + 8 + 8;
 
     final static int HEADER_IDX_PREFIX = 0;
-    final static int HEADER_IDX_ID = 1;
-    final static int HEADER_IDX_TYPE = 9;
-    final static int HEADER_IDX_LEN = 10;
+    final static int HEADER_IDX_TYPE = 1;
+    final static int HEADER_IDX_LEN = 2;
 
-    final static int HEADER_IDX_PREV = 14;
+    final static int HEADER_IDX_PREV = 6;
 
-    final static int HEADER_IDX_NEXT = 22;
+    final static int HEADER_IDX_NEXT = 14;
 
     public final static byte PREFIX = 0x64; /** D */
 
-    private long ID = 0L;
     private long prev = -1;
     private long next = -1;
 
@@ -33,26 +30,17 @@ public class DataBlockHeader {
 
     private byte type = DataType.TYPE_NULL;
 
-    public long getID() {
-        return ID;
-    }
-
-    public static void setTopID(long ID) {
-        TOP_ID.set(ID);
-    }
-
     @Override
     public boolean equals(Object eq) {
         if(eq == this) return true;
         if(eq instanceof DataBlockHeader) {
             DataBlockHeader eqHeader = ((DataBlockHeader)eq);
-            return ID == eqHeader.ID && length == eqHeader.length && type == eqHeader.type;
+            return length == eqHeader.length && type == eqHeader.type;
         }
         return false;
     }
 
     DataBlockHeader(byte type, int length) {
-        this.ID = TOP_ID.getAndIncrement();
         this.type = type;
         this.length = length;
         if(!DataType.checkNumberTypeLength(this.type, this.length)) {
@@ -98,7 +86,6 @@ public class DataBlockHeader {
 
     void writeBuffer(byte[] buffer) {
         buffer[HEADER_IDX_PREFIX] = PREFIX;
-        NumberBufferConverter.fromLong(this.ID, buffer, HEADER_IDX_ID);
         buffer[HEADER_IDX_TYPE] = this.type;
         NumberBufferConverter.fromInt(this.length, buffer, HEADER_IDX_LEN);
         NumberBufferConverter.fromLong(this.prev, buffer, HEADER_IDX_PREV);
@@ -132,7 +119,7 @@ public class DataBlockHeader {
             throw  new DataBlockParseException("Data block header parsing error: Invalid prefix value. (" + DataBlockHeader.PREFIX + " != " + prefix + ")");
         }
         DataBlockHeader dataHeader = new DataBlockHeader();
-        dataHeader.ID =  headerBuffer.getLong();
+
         dataHeader.type = headerBuffer.get();
         dataHeader.length = headerBuffer.getInt();
         if(!DataType.checkNumberTypeLength(dataHeader.type, dataHeader.length)) {
