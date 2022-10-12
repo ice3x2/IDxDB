@@ -21,7 +21,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     private String name;
     private LinkedHashSet<String> indexKeySet;
     private int memCacheSize;
-    private long lastDataStorePos = -1;
+    private long lastIndexStorePos = -1;
     private StoreDelegator storeDelegator;
 
     private String indexKey;
@@ -143,7 +143,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
         try {
             if(headPos < 1) {
                 DataBlock headBlock = dataIO.write(new CSONObject().toByteArray());
-                lastDataStorePos = headPos = headBlock.getPos();
+                lastIndexStorePos = headPos = headBlock.getPos();
             } else {
                 Iterator<DataBlock> dataBlockIterator = dataIO.iterator(headPos);
                 boolean header = true;
@@ -154,19 +154,15 @@ public abstract class IndexCollectionBase implements IndexCollection {
                         continue;
                     }
                     byte[] buffer = dataBlock.getData();
-                    lastDataStorePos = dataBlock.getPos();
+                    lastIndexStorePos = dataBlock.getPos();
                     CSONObject csonObject = new CSONObject(buffer);
                     Object indexValue = csonObject.opt(indexKey);
                     CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, sort, isMemCacheIndex);
-
-                    csonItem.setStoragePos(lastDataStorePos);
+                    csonItem.setIndexPos(lastIndexStorePos);
                     csonItem.setStore(true);
                     onRestoreCSONItem(csonItem);
                 }
-
                 onMemStore();
-
-
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -354,17 +350,27 @@ public abstract class IndexCollectionBase implements IndexCollection {
     protected void makeStoreDelegatorImpl() {
         storeDelegator = new StoreDelegator() {
             @Override
-            public long cache(byte[] buffer) {
+            public long storeIndex(byte[] buffer) {
                 try {
                     DataBlock dataBlock = dataIO.write(buffer);
                     long dataPos = dataBlock.getPos();
-                    dataIO.setNextPos(lastDataStorePos, dataPos);
-                    dataIO.setPrevPos(dataPos, lastDataStorePos);
-                    lastDataStorePos = dataPos;
+                    dataIO.setNextPos(lastIndexStorePos, dataPos);
+                    dataIO.setPrevPos(dataPos, lastIndexStorePos);
+                    lastIndexStorePos = dataPos;
                     return dataPos;
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+            }
+
+            @Override
+            public long loadIndex(long pos) {
+                return 0;
+            }
+
+            @Override
+            public long storeData(byte[] buffer) {
+                return 0;
             }
 
             @Override

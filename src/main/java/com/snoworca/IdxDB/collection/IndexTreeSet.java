@@ -48,7 +48,7 @@ public class IndexTreeSet extends IndexCollectionBase {
         int count = 0;
         int memCacheLimit = getMemCacheSize();
         for (CSONItem csonItem : itemSet) {
-            if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
+            /*if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
                 try {
                     unlink(csonItem);
                 } catch (IOException e) {
@@ -57,6 +57,7 @@ public class IndexTreeSet extends IndexCollectionBase {
                 csonItem.setStoragePos(-1);
             }
             csonItem.storeIfNeed();
+            */
             boolean isMemCache = count > memCacheLimit;
             csonItem.setStore(isMemCache);
             if(isMemCache) {
@@ -126,7 +127,7 @@ public class IndexTreeSet extends IndexCollectionBase {
                         indexChanged = true;
                     break;
                     case TransactionOrder.ORDER_REMOVE:
-                        if(item.getStoragePos() < 0) {
+                        if(!item.isStored()) {
                             CSONItem realItem = get_(item.getCsonObject());
                             if(realItem != null) item = realItem;
                         }
@@ -156,14 +157,14 @@ public class IndexTreeSet extends IndexCollectionBase {
                             item.storeIfNeed();
                             commitResult.incrementCountOfAdd();
                         } else {
-                            if(foundItemOfAddOrReplace.getStoragePos() < 0) {
+                            if(!foundItemOfAddOrReplace.isStored()) {
                                 CSONItem foundItemOfAddOrReplaceReal = get_(foundItemOfAddOrReplace.getCsonObject());
                                 if(foundItemOfAddOrReplaceReal != null) {
                                     foundItemOfAddOrReplace = foundItemOfAddOrReplaceReal;
                                 }
                             }
                             unlink(foundItemOfAddOrReplace);
-                            foundItemOfAddOrReplace.setStoragePos(-1);
+                            foundItemOfAddOrReplace.resetPos();
                             foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
                             foundItemOfAddOrReplace.storeIfNeed();
                             commitResult.incrementCountOfReplace();
@@ -173,14 +174,14 @@ public class IndexTreeSet extends IndexCollectionBase {
                         CSONObject replaceCsonObject = item.getCsonObject();
                         CSONItem foundItemOfReplace = get_(replaceCsonObject);
                         if(foundItemOfReplace != null) {
-                            if(foundItemOfReplace.getStoragePos() < 0) {
+                            if(!foundItemOfReplace.isStored()) {
                                 CSONItem foundItemOfReplaceReal = get_(foundItemOfReplace.getCsonObject());
                                 if(foundItemOfReplaceReal != null) {
                                     foundItemOfReplace = foundItemOfReplaceReal;
                                 }
                             }
                             unlink(foundItemOfReplace);
-                            foundItemOfReplace.setStoragePos(-1);
+                            foundItemOfReplace.resetPos();
                             foundItemOfReplace.setCsonObject(replaceCsonObject);
                             foundItemOfReplace.storeIfNeed();
                             commitResult.incrementCountOfReplace();
