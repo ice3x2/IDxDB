@@ -8,4 +8,10 @@ public class CSONParser {
 		return csonParseIterator.release();
 	}
 
+	public final static CSONElement parse(byte[] buffer, int offset, int len) {
+		CSONParseIterator csonParseIterator = new CSONParseIterator();
+		CSONBufferReader.parse(buffer,offset,len, csonParseIterator);
+		return csonParseIterator.release();
+	}
+
 }

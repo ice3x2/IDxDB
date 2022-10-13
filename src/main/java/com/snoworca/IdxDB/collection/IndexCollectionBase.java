@@ -3,10 +3,13 @@ package com.snoworca.IdxDB.collection;
 import com.snoworca.IdxDB.dataStore.DataBlock;
 import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.IdxDB.OP;
+import com.snoworca.IdxDB.util.NumberBufferConverter;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
+import com.sun.org.glassfish.gmbal.ManagedObject;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -21,7 +24,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     private String name;
     private LinkedHashSet<String> indexKeySet;
     private int memCacheSize;
-    private long lastIndexStorePos = -1;
+    private long lastStorePos = -1;
     private StoreDelegator storeDelegator;
 
     private String indexKey;
@@ -143,7 +146,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
         try {
             if(headPos < 1) {
                 DataBlock headBlock = dataIO.write(new CSONObject().toByteArray());
-                lastIndexStorePos = headPos = headBlock.getPos();
+                lastStorePos = headPos = headBlock.getPos();
             } else {
                 Iterator<DataBlock> dataBlockIterator = dataIO.iterator(headPos);
                 boolean header = true;
@@ -154,11 +157,10 @@ public abstract class IndexCollectionBase implements IndexCollection {
                         continue;
                     }
                     byte[] buffer = dataBlock.getData();
-                    lastIndexStorePos = dataBlock.getPos();
-                    CSONObject csonObject = new CSONObject(buffer);
-                    Object indexValue = csonObject.opt(indexKey);
-                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, sort, isMemCacheIndex);
-                    csonItem.setIndexPos(lastIndexStorePos);
+                    lastStorePos = dataBlock.getPos();
+                    Object indexValue = indexFromBuffer(buffer).get(0);
+                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue, sort, isMemCacheIndex);
+                    csonItem.setStoragePos(lastStorePos);
                     csonItem.setStore(true);
                     onRestoreCSONItem(csonItem);
                 }
@@ -171,7 +173,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
 
 
     protected boolean unlink(CSONItem item) throws IOException {
-        if(item == null || item.getStoragePos() < 0) return false;
+        if(item == null || !item.isStored()) return false;
         if(dataIO != null) {
             dataIO.unlink(item.getStoragePos());
         }
@@ -343,41 +345,70 @@ public abstract class IndexCollectionBase implements IndexCollection {
         return name;
     }
 
+    private CSONArray indexFromBuffer(byte[] buffer) {
+        int indexSize = NumberBufferConverter.toShort(buffer, 0);
+        CSONArray csonArray = new CSONArray(buffer, 2, indexSize);
+        return csonArray;
+    }
+
+    private CSONObject dataFromBuffer(byte[] buffer) {
+        int dataOffset = NumberBufferConverter.toShort(buffer, 0) + 2;
+        CSONObject object = new CSONObject(buffer, dataOffset, buffer.length - dataOffset);
+        return object;
+    }
+
+
     protected StoreDelegator getStoreDelegator() {
         return storeDelegator;
     }
 
+
     protected void makeStoreDelegatorImpl() {
         storeDelegator = new StoreDelegator() {
+
             @Override
-            public long storeIndex(byte[] buffer) {
+            public long storeData(long pos, Object index, CSONObject csonObject) {
+                long dataPos = -1;
+                CSONArray indexArray = new CSONArray().push(index);
+                byte[] idxBuffer = indexArray.toByteArray();
+                byte[] dataBuffer = csonObject.toByteArray();
+                byte[] buffer = new byte[2 + idxBuffer.length + dataBuffer.length];
+                NumberBufferConverter.fromShort((short)idxBuffer.length, buffer, 0);
+                System.arraycopy(idxBuffer,0,buffer,2,idxBuffer.length);
+                System.arraycopy(dataBuffer,0,buffer,2 + idxBuffer.length,dataBuffer.length);
+                DataBlock dataBlock;
                 try {
-                    DataBlock dataBlock = dataIO.write(buffer);
-                    long dataPos = dataBlock.getPos();
-                    dataIO.setNextPos(lastIndexStorePos, dataPos);
-                    dataIO.setPrevPos(dataPos, lastIndexStorePos);
-                    lastIndexStorePos = dataPos;
-                    return dataPos;
+                    if(buffer[0] == 100) {
+                        System.out.println("dhdld");
+                    }
+                    dataBlock = dataIO.write(buffer);
+                    dataPos = dataBlock.getPos();
+                    dataIO.setNextPos(lastStorePos, dataPos);
+                    dataIO.setPrevPos(dataPos, lastStorePos);
+                    lastStorePos = dataPos;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                return dataPos;
+
+            }
+
+            @Override
+            public CSONArray loadIndex(long pos) {
+                try {
+                    DataBlock dataBlock = dataIO.get(pos);
+                    return indexFromBuffer(dataBlock.toBuffer());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             }
 
-            @Override
-            public long loadIndex(long pos) {
-                return 0;
-            }
 
             @Override
-            public long storeData(byte[] buffer) {
-                return 0;
-            }
-
-            @Override
-            public byte[] load(long pos) {
+            public CSONObject loadData(long pos) {
                 try {
                     DataBlock dataBlock = dataIO.get(pos);
-                    return dataBlock.getData();
+                    return dataFromBuffer(dataBlock.getData());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

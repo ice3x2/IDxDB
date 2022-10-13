@@ -12,9 +12,12 @@ import java.util.ArrayDeque;
 public class CSONBufferReader {
 	
 	private final static Charset UTF8 = StandardCharsets.UTF_8;
-	
+
 	public final static void parse(byte[] buffer, ParseCallback callback) {
-		ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+		parse(buffer,0, buffer.length, callback);
+	}
+	public final static void parse(byte[] buffer,int offset, int len, ParseCallback callback) {
+		ByteBuffer byteBuffer = ByteBuffer.wrap(buffer, offset, len);
 		ArrayDeque<Byte> TypeStack = new ArrayDeque<Byte>();
 		TypeStack.addLast(CSONDataType.TYPE_NULL);
 		byte[] header = new byte[CSONDataType.TYPE_HEADER.length];
