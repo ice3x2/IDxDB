@@ -22,7 +22,7 @@ public class DataBlock {
 
     public static DataBlock newNullDataBlock() {
         DataBlock dataPayload = new DataBlock();
-        dataPayload.header = new DataBlockHeader(DataType.TYPE_NULL, 0);
+        dataPayload.header = new DataBlockHeader(DataType.TYPE_NULL, 0, capacityRatio);
         dataPayload.data = new byte[0];
         return dataPayload;
     }
