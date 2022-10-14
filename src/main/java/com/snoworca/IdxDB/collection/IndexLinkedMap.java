@@ -84,7 +84,12 @@ public class IndexLinkedMap extends IndexCollectionBase {
             Iterator<Map.Entry<IndexValue,CSONItem>> iterator = itemHashCacheMap.entrySet(!isReverse).iterator();
             Map.Entry<IndexValue, CSONItem> entry = iterator.next();
             entry.getValue().setStore(true);
-            iterator.remove();
+            try {
+                iterator.remove();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
         }
 
     }
@@ -97,14 +102,6 @@ public class IndexLinkedMap extends IndexCollectionBase {
         boolean asc = getSort() > -1;
         Collection<CSONItem> values = itemHashMap_.values();
         for (CSONItem csonItem : values) {
-            if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
-                try {
-                    unlink(csonItem);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                csonItem.setStoragePos(-1);
-            }
             csonItem.storeIfNeed();
             if(asc) {
                 csonItem.setStore(count > memCacheLimit);
@@ -314,7 +311,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
                                 foundItemOfAddOrReplace = item;
                             } else {
                                 unlink(foundItemOfAddOrReplace);
-                                foundItemOfAddOrReplace.setStoragePos(-1);
+                                foundItemOfAddOrReplace.setStoragePos_(-1);
                                 foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
                                 foundItemOfAddOrReplace.storeIfNeed();
                                 commitResult.incrementCountOfReplace();
@@ -327,7 +324,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
                             CSONItem foundItemOfReplace = itemHashMap_.getAndAccessOrder(IndexValue.newIndexValueCache(indexValueForReplace));
                             if (foundItemOfReplace != null) {
                                 unlink(foundItemOfReplace);
-                                foundItemOfReplace.setStoragePos(-1);
+                                foundItemOfReplace.setStoragePos_(-1);
                                 foundItemOfReplace.setCsonObject(replaceCsonObject);
                                 foundItemOfReplace.storeIfNeed();
                                 commitResult.incrementCountOfReplace();

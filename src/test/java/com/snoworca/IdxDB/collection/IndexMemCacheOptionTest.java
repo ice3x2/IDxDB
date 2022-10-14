@@ -60,6 +60,8 @@ public class IndexMemCacheOptionTest {
 
         assertTrue(timeLap2 > ( timeLap1 * 1.1));
         dbFile.delete();
+
+        idxDB = IdxDB.newMaker(dbFile).make();
     }
 
 
@@ -88,7 +90,6 @@ public class IndexMemCacheOptionTest {
         collectionMemCache.removeByIndex("1");
         collectionMemCache.removeByIndex("50000");
         collectionMemCache.removeByIndex("100000");
-
         collectionMemCache.commit();
 
         for(int i = 1; i < 100000; ++i) {
@@ -121,6 +122,9 @@ public class IndexMemCacheOptionTest {
         System.out.println("인덱스 값 메모리 캐쉬:" + timeLap1 + "ms");
 
         assertTrue(timeLap2 >  timeLap1);
+
+        idxDB = IdxDB.newMaker(dbFile).make();
+
         dbFile.delete();
     }
 }

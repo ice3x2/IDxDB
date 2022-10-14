@@ -16,6 +16,7 @@ class IndexLinkedMapTest {
     @Test
     public void indexMapCacheTest() throws IOException {
         File dbFile = new File("indexMapFindTest.db");
+        //dbFile.delete();
         IdxDB idxDB = IdxDB.newMaker(dbFile).make();
         IndexCollection collection = idxDB.newIndexMapBuilder("map").memCacheSize(100).index("index", -1).setAccessOrder(true).create();
         for(int i = 0; i < 1000; ++i) {
@@ -33,6 +34,7 @@ class IndexLinkedMapTest {
     @Test
     public void indexMapFindAscTest() throws IOException {
         File dbFile = new File("indexMapFindTest.db");
+        //dbFile.delete();
         IdxDB idxDB = IdxDB.newMaker(dbFile).make();
         IndexCollection collection = idxDB.newIndexMapBuilder("map").memCacheSize(100).index("index", -1).setAccessOrder(true).create();
         for(int i = 0; i < 1000; ++i) {
@@ -53,6 +55,7 @@ class IndexLinkedMapTest {
     @Test
     public void indexMapFindDescTest() throws IOException {
         File dbFile = new File("indexMapFindTest.db");
+        //dbFile.delete();
         IdxDB idxDB = IdxDB.newMaker(dbFile).make();
         IndexCollection collection = idxDB.newIndexMapBuilder("map").memCacheSize(100).index("index", 1).setAccessOrder(true).create();
         for(int i = 0; i < 1000; ++i) {

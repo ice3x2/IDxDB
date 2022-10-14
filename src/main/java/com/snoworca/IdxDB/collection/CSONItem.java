@@ -40,7 +40,7 @@ class CSONItem implements Comparable<CSONItem> {
     private Object indexValue;
     private int sort = 0;
     private boolean isStorageSaved = false;
-    private long dataPos_ = -1;
+    private long dataPos = -1;
     private StoreDelegator storeDelegator;
     private boolean isChanged = false;
 
@@ -52,7 +52,7 @@ class CSONItem implements Comparable<CSONItem> {
 
     public CSONObject getCsonObject() {
         if(csonObject == null) {
-            CSONObject loadJSON = storeDelegator.loadData(dataPos_);
+            CSONObject loadJSON = storeDelegator.loadData(dataPos);
             if(!isStorageSaved) csonObject = loadJSON;
             else return loadJSON;
         }
@@ -71,12 +71,12 @@ class CSONItem implements Comparable<CSONItem> {
     }*/
 
     public void storeIfNeed() {
-        if(dataPos_ > -1) return;
+        if(dataPos > -1) return;
         store();
     }
 
     public void release() {
-        dataPos_ = -1;
+        dataPos = -1;
         csonObject = null;
         storeDelegator = null;
     }
@@ -88,7 +88,7 @@ class CSONItem implements Comparable<CSONItem> {
         if(indexVal == null) {
             indexVal = csonObject.get(indexKey);
         }
-        dataPos_ = storeDelegator.storeData(dataPos_, indexVal, csonObject);
+        dataPos = storeDelegator.storeData(dataPos, indexVal, csonObject);
         isStorageSaved = true;
     }
 
@@ -111,13 +111,13 @@ class CSONItem implements Comparable<CSONItem> {
 
 
     protected boolean isStored() {
-        return this.dataPos_ > -1;
+        return this.dataPos > -1;
     }
 
 
 
-    protected void setStoragePos(long pos) {
-        this.dataPos_ = pos;
+    protected void setStoragePos_(long pos) {
+        this.dataPos = pos;
         if(pos > -1 && storeDelegator != null) {
             isStorageSaved = true;
         }
@@ -173,14 +173,14 @@ class CSONItem implements Comparable<CSONItem> {
 
 
     public long getStoragePos() {
-        return dataPos_;
+        return dataPos;
     }
 
     public Object getIndexValue() {
         if(isMemCacheIndex || this.indexValue != null) {
             return this.indexValue;
         }
-        return storeDelegator.loadIndex(dataPos_).get(0);
+        return storeDelegator.loadIndex(dataPos).get(0);
     }
 
     /*public void setIndexValue(Object object) {
@@ -208,7 +208,7 @@ class CSONItem implements Comparable<CSONItem> {
 
 
     protected void resetPos() {
-        dataPos_ = -1;
+        dataPos = -1;
         isStorageSaved = false;
     }
 

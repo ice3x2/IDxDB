@@ -160,7 +160,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
                     lastStorePos = dataBlock.getPos();
                     Object indexValue = indexFromBuffer(buffer).get(0);
                     CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue, sort, isMemCacheIndex);
-                    csonItem.setStoragePos(lastStorePos);
+                    csonItem.setStoragePos_(lastStorePos);
                     csonItem.setStore(true);
                     onRestoreCSONItem(csonItem);
                 }
@@ -367,7 +367,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
         storeDelegator = new StoreDelegator() {
 
             @Override
-            public long storeData(long pos, Object index, CSONObject csonObject) {
+            public long storeData(long pos_, Object index, CSONObject csonObject) {
                 long dataPos = -1;
                 CSONArray indexArray = new CSONArray().push(index);
                 byte[] idxBuffer = indexArray.toByteArray();
@@ -378,9 +378,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
                 System.arraycopy(dataBuffer,0,buffer,2 + idxBuffer.length,dataBuffer.length);
                 DataBlock dataBlock;
                 try {
-                    if(buffer[0] == 100) {
-                        System.out.println("dhdld");
-                    }
+
                     dataBlock = dataIO.write(buffer);
                     dataPos = dataBlock.getPos();
                     dataIO.setNextPos(lastStorePos, dataPos);
@@ -397,7 +395,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
             public CSONArray loadIndex(long pos) {
                 try {
                     DataBlock dataBlock = dataIO.get(pos);
-                    return indexFromBuffer(dataBlock.toBuffer());
+                    return indexFromBuffer(dataBlock.getData());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
