@@ -123,6 +123,34 @@ public class DataIO {
         return write(DataBlock.newDataBlock(value));
     }
 
+    public DataBlock writeOrReplace(byte[] buffer, long pos, float capacityRatio) throws IOException {
+        if(pos < 0) {
+            return write(buffer, capacityRatio);
+        }
+        DataBlock dataBlock = get(pos);
+        DataBlockHeader dataBlockHeader = dataBlock.getHeader();
+        int originLen = dataBlockHeader.getLength();
+        int capacity = dataBlockHeader.getCapacity();
+        if(originLen == buffer.length) {
+            dataWriter.replace(pos + DataBlockHeader.HEADER_SIZE, buffer);
+            dataBlock.changeData(buffer);
+            return dataBlock;
+        } else if(capacity <  buffer.length) {
+            unlink(pos);
+            return write(buffer, capacityRatio);
+        }
+        dataWriter.replace(pos + DataBlockHeader.HEADER_IDX_LEN, NumberBufferConverter.fromInt(buffer.length));
+        dataWriter.replace(pos + DataBlockHeader.HEADER_SIZE, buffer);
+        dataBlock.changeData(buffer);
+        return dataBlock;
+    }
+
+    public DataBlock write(byte[] buffer, float capacityRatio) throws IOException {
+        DataBlock block = write(DataBlock.newDataBlock(buffer, capacityRatio));
+        return block;
+    }
+
+
     public DataBlock write(Character value)  throws IOException {
         return write(DataBlock.newDataBlock(value));
     }
@@ -235,7 +263,7 @@ public class DataIO {
 
 
     public DataBlock write(byte[] buffer) throws IOException {
-        DataBlock block = write(DataBlock.newDataBlock(buffer));
+        DataBlock block = write(DataBlock.newDataBlock(buffer, 0));
         return block;
     }
     private DataBlock write(DataBlock dataBlock) throws IOException {

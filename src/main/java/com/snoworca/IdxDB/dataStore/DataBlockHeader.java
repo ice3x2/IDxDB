@@ -45,10 +45,10 @@ public class DataBlockHeader {
     }
 
     DataBlockHeader(byte type, int length, float capacity) {
-        this.type = type;
-        if(!DataType.checkNumberTypeLength(this.type, this.length)) {
+        if(!DataType.checkNumberTypeLength(type, length)) {
             throw new DataBlockParseException("Size of the data defined as a primitive type is different.");
         }
+        this.type = type;
         setLength(length, capacity);
     }
 
@@ -69,13 +69,17 @@ public class DataBlockHeader {
         return length;
     }
 
-    public void setLength(int length, float capacityRatio) {
+    private void setLength(int length, float capacityRatio) {
         this.length = length;
         // capacityRatio 값을 % 단위로 length에 반영
         if(capacityRatio < 0) {
             capacityRatio = 0;
         }
         this.capacity = (int)(length * (capacityRatio + 1.0f));
+    }
+
+    public void setLength(int length) {
+        this.length = length;
     }
 
     public byte getType() {

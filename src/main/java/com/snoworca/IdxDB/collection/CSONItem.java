@@ -90,6 +90,7 @@ class CSONItem implements Comparable<CSONItem> {
         }
         dataPos = storeDelegator.storeData(dataPos, indexVal, csonObject);
         isStorageSaved = true;
+        isChanged = false;
     }
 
 
@@ -108,6 +109,13 @@ class CSONItem implements Comparable<CSONItem> {
             }
         }
     }
+
+
+    public void replace(CSONObject jsonObject) {
+        setCsonObject(jsonObject);
+        store();
+    }
+
 
 
     protected boolean isStored() {

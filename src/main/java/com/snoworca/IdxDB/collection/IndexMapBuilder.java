@@ -41,6 +41,11 @@ public class IndexMapBuilder {
     }
 
 
+    public IndexMapBuilder setCapacityRatio(float ratio) {
+        indexMapOption.setCapacityRatio(ratio);
+        return this;
+    }
+
     public IndexMapBuilder memCacheSize(int limit) {
         indexMapOption.setMemCacheSize(limit);
         return this;

@@ -399,6 +399,56 @@ class IdxDBTest {
 
         file.delete();
 
+    }
+
+    @Test
+    public void replaceDataSetTest() throws IOException {
+        File file = new File("test.db");
+        file.delete();
+        IdxDB db = IdxDB.newMaker(file).make();
+        IndexTreeSet indexTreeSet = db.newIndexTreeSetBuilder("testDB").index("key", 1).setCapacityRatio(0.5f).create();
+        indexTreeSet.add(new CSONObject().put("key", "1234567890").put("value", "BBBBBBBBBB"));
+        indexTreeSet.commit();
+        long fileSize = file.length();
+        indexTreeSet.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "AAAAAAAAAAAAAA"));
+        System.out.println(indexTreeSet.commit().toString());
+        assertEquals(fileSize, file.length());
+
+        assertEquals("AAAAAAAAAAAAAA", indexTreeSet.findOneByIndex("1234567890").get("value"));
+
+
+        indexTreeSet.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc"));
+        indexTreeSet.commit();
+
+        assertNotEquals(fileSize, file.length());
+
+        assertEquals("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc", indexTreeSet.findOneByIndex("1234567890").get("value"));
+
+    }
+
+
+    @Test
+    public void replaceDataMapTest() throws IOException {
+        File file = new File("test.db");
+        file.delete();
+        IdxDB db = IdxDB.newMaker(file).make();
+        IndexLinkedMap indexLinkedMap = db.newIndexMapBuilder("testDB").index("key", 1).setCapacityRatio(0.5f).create();
+        indexLinkedMap.add(new CSONObject().put("key", "1234567890").put("value", "BBBBBBBBBB"));
+        indexLinkedMap.commit();
+        long fileSize = file.length();
+        indexLinkedMap.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "AAAAAAAAAAAAAA"));
+        System.out.println(indexLinkedMap.commit().toString());
+        assertEquals(fileSize, file.length());
+
+        assertEquals("AAAAAAAAAAAAAA", indexLinkedMap.findOneByIndex("1234567890").get("value"));
+
+
+        indexLinkedMap.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc"));
+        indexLinkedMap.commit();
+
+        assertNotEquals(fileSize, file.length());
+
+        assertEquals("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc", indexLinkedMap.findOneByIndex("1234567890").get("value"));
 
     }
 

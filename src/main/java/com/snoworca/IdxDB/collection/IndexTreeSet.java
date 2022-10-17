@@ -163,10 +163,7 @@ public class IndexTreeSet extends IndexCollectionBase {
                                     foundItemOfAddOrReplace = foundItemOfAddOrReplaceReal;
                                 }
                             }
-                            unlink(foundItemOfAddOrReplace);
-                            foundItemOfAddOrReplace.resetPos();
-                            foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
-                            foundItemOfAddOrReplace.storeIfNeed();
+                            foundItemOfAddOrReplace.replace(addOrReplaceCsonObject);
                             commitResult.incrementCountOfReplace();
                         }
                     break;
@@ -180,10 +177,7 @@ public class IndexTreeSet extends IndexCollectionBase {
                                     foundItemOfReplace = foundItemOfReplaceReal;
                                 }
                             }
-                            unlink(foundItemOfReplace);
-                            foundItemOfReplace.resetPos();
-                            foundItemOfReplace.setCsonObject(replaceCsonObject);
-                            foundItemOfReplace.storeIfNeed();
+                            foundItemOfReplace.replace(replaceCsonObject);
                             commitResult.incrementCountOfReplace();
                         }
                     break;
@@ -390,6 +384,12 @@ public class IndexTreeSet extends IndexCollectionBase {
             }
         }
         return list;
+    }
+
+    @Override
+    public long findIndexPos(Object indexValue) {
+        CSONItem foundItem = get_(new CSONObject().put(indexKey, indexValue));
+        return foundItem != null ? foundItem.getStoragePos() : -1;
     }
 
 

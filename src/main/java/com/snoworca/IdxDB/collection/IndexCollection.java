@@ -48,5 +48,9 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     public void clear();
 
+    long findIndexPos(Object indexValue);
+
+
+
 
 }

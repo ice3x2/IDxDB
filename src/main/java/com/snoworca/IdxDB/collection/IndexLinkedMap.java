@@ -310,10 +310,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
                                 commitResult.incrementCountOfAdd();
                                 foundItemOfAddOrReplace = item;
                             } else {
-                                unlink(foundItemOfAddOrReplace);
-                                foundItemOfAddOrReplace.setStoragePos_(-1);
-                                foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
-                                foundItemOfAddOrReplace.storeIfNeed();
+                                foundItemOfAddOrReplace.replace(addOrReplaceCsonObject);
                                 commitResult.incrementCountOfReplace();
                             }
                             addCache(memCacheSize, foundItemOfAddOrReplace);
@@ -323,10 +320,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
                             Object indexValueForReplace = item.getIndexValue();
                             CSONItem foundItemOfReplace = itemHashMap_.getAndAccessOrder(IndexValue.newIndexValueCache(indexValueForReplace));
                             if (foundItemOfReplace != null) {
-                                unlink(foundItemOfReplace);
-                                foundItemOfReplace.setStoragePos_(-1);
-                                foundItemOfReplace.setCsonObject(replaceCsonObject);
-                                foundItemOfReplace.storeIfNeed();
+                                foundItemOfReplace.replace(replaceCsonObject);
                                 commitResult.incrementCountOfReplace();
                                 addCache(memCacheSize, foundItemOfReplace);
                             }
@@ -360,6 +354,11 @@ public class IndexLinkedMap extends IndexCollectionBase {
         }
     }
 
+    @Override
+    public long findIndexPos(Object indexValue) {
+        CSONItem item = itemHashMap_.get(IndexValue.newIndexValueCache(indexValue));
+        return item != null ? item.getStoragePos() : -1;
+    }
 
 
     @Override

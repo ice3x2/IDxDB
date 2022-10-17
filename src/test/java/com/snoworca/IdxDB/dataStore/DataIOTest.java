@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.dataStore;
 
+
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -9,8 +10,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 class DataIOTest {
 
@@ -260,7 +260,38 @@ class DataIOTest {
 
 
     @Test
-    void start() {
+    void dataChangeTest() throws IOException {
+        File file = new File("./dataChangeTest.dat");
+        file.delete();
+        String randomString = makeRandomString();
+        DataIO dataIO = new DataIO(file);
+        dataIO.open();
+
+        DataBlock block = dataIO.writeOrReplace(randomString.getBytes(),-1,1.0f);
+        long pos = block.getPos();
+        int len = block.getHeader().getLength();
+        block = dataIO.writeOrReplace("test".getBytes(), pos, 1.0f);
+        assertEquals(pos, block.getPos());
+        assertNotEquals(len, block.getHeader().getLength());
+        len = block.getHeader().getLength();
+        assertEquals(new String(dataIO.get(pos).getData()), "test");
+
+
+        block = dataIO.writeOrReplace("1es1".getBytes(), pos, 1.0f);
+        assertEquals(pos, block.getPos());
+        assertEquals(len, block.getHeader().getLength());
+        assertEquals(new String(dataIO.get(block.getPos()).getData()), "1es1");
+
+        block = dataIO.writeOrReplace((randomString + randomString + randomString).getBytes(), pos, 1.0f);
+        assertNotEquals(pos, block.getPos());
+        assertEquals(block.getHeader().getCapacity(), (randomString + randomString + randomString).getBytes().length * 2);
+
+
+
+
+
+        dataIO.close();
+        file.delete();
     }
 
     @Test

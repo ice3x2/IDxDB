@@ -14,7 +14,7 @@ public class DataBlockHeaderTest {
     @Test
     public void dataHeaderParsingTest() {
 
-        DataBlockHeader dataHeader = new DataBlockHeader(DataType.TYPE_DOUBLE, 8);
+        DataBlockHeader dataHeader = new DataBlockHeader(DataType.TYPE_DOUBLE, 8, 0);
         byte[] buffer = new byte[DataBlockHeader.HEADER_SIZE];
         dataHeader.writeBuffer(buffer);
 
@@ -31,14 +31,14 @@ public class DataBlockHeaderTest {
 
         boolean isFail = false;
         try {
-            new DataBlockHeader(DataType.TYPE_DOUBLE, 1230);
+            new DataBlockHeader(DataType.TYPE_DOUBLE, 1230, 0);
         } catch (DataBlockParseException e) {
             e.printStackTrace();
             isFail = true;
         }
         assertTrue(isFail);
 
-        DataBlockHeader dataHeader = new DataBlockHeader(DataType.TYPE_DOUBLE, 8);
+        DataBlockHeader dataHeader = new DataBlockHeader(DataType.TYPE_DOUBLE, 8, 0);
         byte[] buffer = new byte[DataBlockHeader.HEADER_SIZE];
         dataHeader.writeBuffer(buffer);
         buffer[DataBlockHeader.HEADER_IDX_TYPE] = DataType.TYPE_BYTE;

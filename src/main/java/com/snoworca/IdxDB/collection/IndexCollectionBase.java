@@ -6,10 +6,8 @@ import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.util.NumberBufferConverter;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
-import com.sun.org.glassfish.gmbal.ManagedObject;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -33,6 +31,8 @@ public abstract class IndexCollectionBase implements IndexCollection {
 
     private boolean isMemCacheIndex = true;
 
+    private float capacityRatio = 0.3f;
+    private boolean isCapacityFixed = false;
 
     private CollectionOption collectionOption;
 
@@ -45,6 +45,8 @@ public abstract class IndexCollectionBase implements IndexCollection {
         this.memCacheLimit = collectionOption.getMemCacheSize();
         this.headPos = collectionOption.getHeadPos();
         this.isMemCacheIndex = collectionOption.isMemCacheIndex();
+        this.capacityRatio = collectionOption.getCapacityRatio();
+        this.isCapacityFixed = capacityRatio < 0.001f;
         onInit(collectionOption);
         if (this.dataIO != null) {
             makeStoreDelegatorImpl();
@@ -74,6 +76,8 @@ public abstract class IndexCollectionBase implements IndexCollection {
         if(result.isEmpty()) return null;
         return result.get(0);
     }
+
+
 
     @Override
     public boolean addOrReplaceAll(CSONArray csonArray) {
@@ -156,7 +160,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
                         header = false;
                         continue;
                     }
-                    byte[] buffer = dataBlock.getData();
+                    byte[] buffer = dataBlock.getPayload();
                     lastStorePos = dataBlock.getPos();
                     Object indexValue = indexFromBuffer(buffer).get(0);
                     CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue, sort, isMemCacheIndex);
@@ -378,8 +382,11 @@ public abstract class IndexCollectionBase implements IndexCollection {
                 System.arraycopy(dataBuffer,0,buffer,2 + idxBuffer.length,dataBuffer.length);
                 DataBlock dataBlock;
                 try {
-
-                    dataBlock = dataIO.write(buffer);
+                    if(pos_ < 0) {
+                        dataBlock = dataIO.write(buffer, capacityRatio);
+                    } else {
+                        dataBlock = dataIO.writeOrReplace(buffer, pos_, capacityRatio);
+                    }
                     dataPos = dataBlock.getPos();
                     dataIO.setNextPos(lastStorePos, dataPos);
                     dataIO.setPrevPos(dataPos, lastStorePos);
@@ -388,14 +395,13 @@ public abstract class IndexCollectionBase implements IndexCollection {
                     throw new RuntimeException(e);
                 }
                 return dataPos;
-
             }
 
             @Override
             public CSONArray loadIndex(long pos) {
                 try {
                     DataBlock dataBlock = dataIO.get(pos);
-                    return indexFromBuffer(dataBlock.getData());
+                    return indexFromBuffer(dataBlock.getPayload());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -406,7 +412,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
             public CSONObject loadData(long pos) {
                 try {
                     DataBlock dataBlock = dataIO.get(pos);
-                    return dataFromBuffer(dataBlock.getData());
+                    return dataFromBuffer(dataBlock.getPayload());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

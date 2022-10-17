@@ -76,7 +76,7 @@ public class DataBlockTest {
         int len = ThreadLocalRandom.current().nextInt(1000) + 1000;
         byte[] value = new byte[len];
         ThreadLocalRandom.current().nextBytes(value);
-        DataBlock block = DataBlock.newDataBlock(value);
+        DataBlock block = DataBlock.newDataBlock(value, 0);
         byte[] buffer = block.toBuffer();
 
         ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
@@ -94,7 +94,7 @@ public class DataBlockTest {
         int len = ThreadLocalRandom.current().nextInt(200) + 200;
         byte[] value = new byte[len];
         ThreadLocalRandom.current().nextBytes(value);
-        DataBlock block = DataBlock.newDataBlock(value);
+        DataBlock block = DataBlock.newDataBlock(value, 0);
         byte[] buffer = block.toBuffer();
 
         int lenA = ThreadLocalRandom.current().nextInt(100) + DataBlockHeader.HEADER_SIZE;

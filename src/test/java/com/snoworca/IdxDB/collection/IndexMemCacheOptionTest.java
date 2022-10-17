@@ -74,7 +74,7 @@ public class IndexMemCacheOptionTest {
         IndexCollection collectionMemCache = idxDB.newIndexMapBuilder("memCacheIndex").index("key", 1).memCacheSize(100).setMemCacheIndex(true).create();
         IndexCollection collectionNoCache = idxDB.newIndexMapBuilder("noCacheIndex").index("key", 1).memCacheSize(100).setMemCacheIndex(false).create();
 
-        for(int i = 0; i < 1000; ++i) {
+        for(int i = 0; i < 50000; ++i) {
             collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i).put("str","sdafjkasdklfjasdklfjasdlfk;jasdlfk;jasdfkl;asdfjasdl;fkhjasdj;dfasjklf"));
             collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i).put("str","sdafjkasdklfjasdklfjasdlfk;jasdlfk;jasdfkl;asdfjasdl;fkhjasdj;dfasjklf"));
         }

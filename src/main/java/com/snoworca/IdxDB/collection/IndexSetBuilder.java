@@ -51,6 +51,11 @@ public class IndexSetBuilder {
         return this;
     }
 
+    public IndexSetBuilder setCapacityRatio(float ratio) {
+        indexSetOption.setCapacityRatio(ratio);
+        return this;
+    }
+
 
 
 
