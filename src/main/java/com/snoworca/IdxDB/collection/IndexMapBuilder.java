@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.IdxDB.CollectionCreateCallback;
 
@@ -39,7 +40,6 @@ public class IndexMapBuilder {
         indexMapOption.setMemCacheIndex(enable);
         return this;
     }
-
 
     public IndexMapBuilder setCapacityRatio(float ratio) {
         indexMapOption.setCapacityRatio(ratio);

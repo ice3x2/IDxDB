@@ -10,10 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -449,7 +446,81 @@ class IdxDBTest {
         assertNotEquals(fileSize, file.length());
 
         assertEquals("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc", indexLinkedMap.findOneByIndex("1234567890").get("value"));
+        file.delete();
 
     }
+
+    @Test
+    public void compressionTest() throws IOException {
+        Random rand = new Random(System.currentTimeMillis());
+
+        File file = new File("test.db");
+        file.delete();
+        IdxDB noneDB = IdxDB.newMaker(file).compressionType(CompressionType.NONE).make();
+        IndexTreeSet indexTreeSetNone = noneDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetNone.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        long start = System.currentTimeMillis();
+        indexTreeSetNone.commit();
+        System.out.println("압축하지 않음: " + (file.length() / 1024 / 1024) + "Mb   " + (System.currentTimeMillis() - start) + "ms" );
+        noneDB.close();
+        file.delete();
+
+
+        IdxDB gzipDB = IdxDB.newMaker(file).compressionType(CompressionType.GZIP).make();
+        IndexTreeSet indexTreeSetGZIP = gzipDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetGZIP.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        start = System.currentTimeMillis();
+        indexTreeSetGZIP.commit();
+        System.out.println("Gzip 압축: " + (file.length() / 1024 / 1024) + "Mb  " + (System.currentTimeMillis() - start) + "ms" );
+        gzipDB.close();
+        file.delete();
+
+
+        IdxDB deflateDB = IdxDB.newMaker(file).compressionType(CompressionType.Deflater).make();
+        IndexTreeSet indexTreeSetDeflate = deflateDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetDeflate.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        start = System.currentTimeMillis();
+        indexTreeSetDeflate.commit();
+        System.out.println("Deflate 압축: " + (file.length() / 1024 / 1024) + "Mb  " + (System.currentTimeMillis() - start) + "ms" );
+        deflateDB.close();
+        file.delete();
+
+        IdxDB snappyDB = IdxDB.newMaker(file).compressionType(CompressionType.SNAPPY).make();
+        IndexTreeSet indexTreeSetSnappy = snappyDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetSnappy.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        start = System.currentTimeMillis();
+        indexTreeSetSnappy.commit();
+        System.out.println("Snappy 압축: " + (file.length() / 1024 / 1024) + "Mb  " + (System.currentTimeMillis() - start) + "ms" );
+        snappyDB.close();
+
+        snappyDB = IdxDB.newMaker(file).compressionType(CompressionType.SNAPPY).make();
+        file.delete();
+    }
+
+
 
 }

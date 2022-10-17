@@ -1,8 +1,13 @@
 package com.snoworca.IdxDB.dataStore;
 
+import com.snoworca.IdxDB.CompressionType;
+import com.snoworca.IdxDB.util.CompressionUtil;
+import com.snoworca.IdxDB.util.NumberBufferConverter;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicLong;
@@ -14,16 +19,19 @@ public class DataWriter {
     private RandomAccessFile randomAccessFile;
     private FileChannel writeChannel;
 
+    private CompressionType compressionType = CompressionType.NONE;
+
     private AtomicLong dataLength = new AtomicLong(0);
     private AtomicLong fileSize = new AtomicLong(0);
 
     private ReentrantLock lock = new ReentrantLock();
     private boolean isLock = false;
 
-    DataWriter(File file) {
+    DataWriter(File file, CompressionType compressionType) {
         this.dataFile = file;
         this.dataLength.set(file.length());
         this.fileSize.set(file.length());
+        this.compressionType = compressionType;
     }
 
     public long length() {
@@ -37,6 +45,20 @@ public class DataWriter {
         return isLock;
     }
 
+
+    private byte[] compress(byte[] buffer) {
+        if(compressionType == CompressionType.GZIP) {
+            return CompressionUtil.compressGZIP(buffer);
+        }
+        else if(compressionType == CompressionType.Deflater) {
+            return CompressionUtil.compressDeflate(buffer);
+        }
+        else if(compressionType == CompressionType.SNAPPY) {
+            return CompressionUtil.compressSnappy(buffer);
+        }
+        return buffer;
+
+    }
 
 
     public void open() throws IOException {
@@ -85,15 +107,39 @@ public class DataWriter {
         }
     }
 
+    public void changeData(DataBlock dataBlock, byte[] buffer) throws IOException {
+        lock.lock();
+        isLock = true;
+        try {
+            long pos = dataBlock.getPos();
+            buffer = compress(buffer);
+            if(buffer.length != dataBlock.getHeader().getLength()) {
+                replace(pos + DataBlockHeader.HEADER_IDX_LEN, NumberBufferConverter.fromInt(buffer.length));
+            }
+            dataBlock.changeData(buffer);
+            randomAccessFile.seek(pos + DataBlockHeader.HEADER_SIZE);
+            writeChannel.write(ByteBuffer.wrap(buffer));
+        } finally {
+            isLock = false;
+            lock.unlock();
+        }
+    }
+
     public void write(DataBlock block) throws IOException {
         lock.lock();
         isLock = true;
         try {
-            byte[] buffer = block.toBuffer();
+            byte[] headerBuffer = new byte[DataBlockHeader.HEADER_SIZE];
+            block.getHeader().writeBuffer(headerBuffer);
             block.setPos(dataLength.get());
+            writeChannel.write(ByteBuffer.wrap(headerBuffer));
+            this.dataLength.addAndGet(DataBlockHeader.HEADER_SIZE);
+
+            byte[] dataBuffer = block.getPayload();;
+            dataBuffer = compress(dataBuffer);
             randomAccessFile.seek(this.dataLength.get());
-            writeChannel.write(ByteBuffer.wrap(buffer));
-            this.dataLength.addAndGet(buffer.length);
+            writeChannel.write(ByteBuffer.wrap(dataBuffer));
+            this.dataLength.addAndGet(dataBuffer.length);
         } finally {
             isLock = false;
             lock.unlock();

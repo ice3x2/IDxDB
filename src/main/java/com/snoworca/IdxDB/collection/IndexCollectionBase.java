@@ -1,8 +1,10 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.dataStore.DataBlock;
 import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.IdxDB.OP;
+import com.snoworca.IdxDB.util.CompressionUtil;
 import com.snoworca.IdxDB.util.NumberBufferConverter;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
@@ -36,6 +38,8 @@ public abstract class IndexCollectionBase implements IndexCollection {
 
     private CollectionOption collectionOption;
 
+    private CompressionType compressionType;
+
     IndexCollectionBase(DataIO dataIO, CollectionOption collectionOption) {
         this.dataIO = dataIO;
         this.name = collectionOption.getName();
@@ -52,7 +56,6 @@ public abstract class IndexCollectionBase implements IndexCollection {
             makeStoreDelegatorImpl();
         }
         initData();
-
 
         this.collectionOption = collectionOption;
     }
@@ -367,6 +370,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
     }
 
 
+
     protected void makeStoreDelegatorImpl() {
         storeDelegator = new StoreDelegator() {
 
@@ -375,7 +379,7 @@ public abstract class IndexCollectionBase implements IndexCollection {
                 long dataPos = -1;
                 CSONArray indexArray = new CSONArray().push(index);
                 byte[] idxBuffer = indexArray.toByteArray();
-                byte[] dataBuffer = csonObject.toByteArray();
+                byte[] dataBuffer =csonObject.toByteArray();
                 byte[] buffer = new byte[2 + idxBuffer.length + dataBuffer.length];
                 NumberBufferConverter.fromShort((short)idxBuffer.length, buffer, 0);
                 System.arraycopy(idxBuffer,0,buffer,2,idxBuffer.length);

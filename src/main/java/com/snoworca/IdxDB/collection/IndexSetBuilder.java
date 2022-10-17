@@ -1,6 +1,7 @@
 package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CollectionCreateCallback;
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.dataStore.DataIO;
 
 import java.util.concurrent.locks.ReentrantLock;
@@ -50,6 +51,7 @@ public class IndexSetBuilder {
         indexSetOption.setMemCacheIndex(enable);
         return this;
     }
+
 
     public IndexSetBuilder setCapacityRatio(float ratio) {
         indexSetOption.setCapacityRatio(ratio);

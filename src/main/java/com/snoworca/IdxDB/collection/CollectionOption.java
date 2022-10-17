@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.collection;
 
+
 import com.snoworca.cson.CSONObject;
 
 public class CollectionOption {
@@ -42,6 +43,7 @@ public class CollectionOption {
     public void setOption(String key, Object value) {
         this.option.put(key, value);
     }
+
 
 
     public void setCapacityRatio(float ratio) {

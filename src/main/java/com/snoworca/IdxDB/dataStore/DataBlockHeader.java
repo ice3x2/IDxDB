@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.dataStore;
 
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.exception.DataBlockParseException;
 import com.snoworca.IdxDB.util.NumberBufferConverter;
 
@@ -8,21 +9,26 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class DataBlockHeader {
 
-    // prefix(1) type(1), capacity(4), len(4), prev(8), next(8)
-    final static int HEADER_SIZE = 1 + 1 + 4 + 4 + 8 + 8;
+    // prefix(1) type(1),compressionType(1), capacity(4), len(4), prev(8), next(8)
+    final static int HEADER_SIZE = 1 + 1 + 1 + 4 + 4 + 8 + 8;
 
     final static int HEADER_IDX_PREFIX = 0;
     final static int HEADER_IDX_TYPE = 1;
 
-    final static int HEADER_IDX_CAPACITY = 2;
-    final static int HEADER_IDX_LEN = 6;
+    final static int HEADER_IDX_COMPRESSION_TYPE = 2;
 
-    final static int HEADER_IDX_PREV = 10;
+    final static int HEADER_IDX_CAPACITY = 3;
+    final static int HEADER_IDX_LEN = 7;
 
-    final static int HEADER_IDX_NEXT = 18;
+    final static int HEADER_IDX_PREV = 11;
+
+    final static int HEADER_IDX_NEXT = 19;
+
 
 
     public final static byte PREFIX = 0x64; /** D */
+
+    private byte compressionType = (byte)CompressionType.NONE.getValue();
 
     private long prev = -1;
     private long next = -1;
@@ -82,6 +88,15 @@ public class DataBlockHeader {
         this.length = length;
     }
 
+    public CompressionType getCompressionType() {
+        return CompressionType.fromValue(compressionType);
+    }
+
+    public void setCompressionType(CompressionType compressionType) {
+        this.compressionType = (byte) compressionType.getValue();
+    }
+
+
     public byte getType() {
         return type;
     }
@@ -109,6 +124,7 @@ public class DataBlockHeader {
     void writeBuffer(byte[] buffer) {
         buffer[HEADER_IDX_PREFIX] = PREFIX;
         buffer[HEADER_IDX_TYPE] = this.type;
+        buffer[HEADER_IDX_COMPRESSION_TYPE] = this.compressionType;
         NumberBufferConverter.fromInt(this.capacity, buffer, HEADER_IDX_CAPACITY);
         NumberBufferConverter.fromInt(this.length, buffer, HEADER_IDX_LEN);
         NumberBufferConverter.fromLong(this.prev, buffer, HEADER_IDX_PREV);
@@ -144,6 +160,7 @@ public class DataBlockHeader {
         DataBlockHeader dataHeader = new DataBlockHeader();
 
         dataHeader.type = headerBuffer.get();
+        dataHeader.compressionType = headerBuffer.get();
         dataHeader.capacity = headerBuffer.getInt();
         dataHeader.length = headerBuffer.getInt();
         if(!DataType.checkNumberTypeLength(dataHeader.type, dataHeader.length)) {

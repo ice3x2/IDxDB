@@ -274,7 +274,7 @@ class DataIOTest {
         assertEquals(pos, block.getPos());
         assertNotEquals(len, block.getHeader().getLength());
         len = block.getHeader().getLength();
-        assertEquals(new String(dataIO.get(pos).getData()), "test");
+        assertEquals("test", new String(dataIO.get(pos).getData()));
 
 
         block = dataIO.writeOrReplace("1es1".getBytes(), pos, 1.0f);
@@ -346,7 +346,6 @@ class DataIOTest {
         }
 
 
-
         iteratorCache = dataBlocks.iterator();
         iteratorStore = dataIO.iterator(startPos);
         while(iteratorStore.hasNext()) {
@@ -354,10 +353,5 @@ class DataIOTest {
             DataBlock blockOrigin = iteratorCache.next();
             assertArrayEquals(blockOrigin.getData(), block.getData());
         }
-
-
-
-
-
     }
 }

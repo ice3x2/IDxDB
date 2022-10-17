@@ -1,5 +1,8 @@
 package com.snoworca.IdxDB.dataStore;
 
+import com.snoworca.IdxDB.CompressionType;
+import com.snoworca.IdxDB.util.CompressionUtil;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -45,6 +48,18 @@ public class DataReader {
         }
     }
 
+    private byte[] decompress(CompressionType compressionType, byte[] buffer) {
+        if(compressionType == CompressionType.GZIP) {
+            return CompressionUtil.decompressGZIP(buffer, 0, buffer.length);
+        } else if(compressionType == CompressionType.Deflater) {
+            return CompressionUtil.decompressDeflate(buffer, 0, buffer.length);
+        } else if(compressionType == CompressionType.SNAPPY) {
+            return CompressionUtil.decompressSnappy(buffer, 0, buffer.length);
+        }
+        return buffer;
+
+    }
+
     private DataBlock read(boolean retry) throws IOException {
         headerBuffer.clear();
 
@@ -56,10 +71,21 @@ public class DataReader {
         }
         headerBuffer.flip();
         DataBlockHeader dataBlockHeader = DataBlockHeader.fromByteBuffer(headerBuffer);
+        CompressionType compressionType = dataBlockHeader.getCompressionType();
         int len = dataBlockHeader.getLength();
         ByteBuffer dataBuffer = cachedBuffer;
-        if(len > cachedBufferSize + HEADER_BUFFER_SIZE) {
-            dataBuffer = ByteBuffer.allocate(len - HEADER_BUFFER_SIZE + DataBlockHeader.HEADER_SIZE);
+        boolean isWrapBuffer = false;
+        byte[] decompressed = null;
+        if(compressionType != CompressionType.NONE) {
+            decompressed = new byte[len];
+        }
+        else if(len > cachedBufferSize + HEADER_BUFFER_SIZE) {
+            if(decompressed != null) {
+                isWrapBuffer = true;
+                dataBuffer = ByteBuffer.wrap(decompressed);
+            }  else {
+                dataBuffer = ByteBuffer.allocate(len - HEADER_BUFFER_SIZE + DataBlockHeader.HEADER_SIZE);
+            }
         }
         DataBlock dataBlock = null;
         if(len > HEADER_BUFFER_SIZE - DataBlockHeader.HEADER_SIZE) {
@@ -67,7 +93,17 @@ public class DataReader {
             dataBuffer.limit(len - HEADER_BUFFER_SIZE + DataBlockHeader.HEADER_SIZE);
             fileChannel.read(dataBuffer);
             dataBuffer.flip();
-            dataBlock = DataBlock.parseData(dataBlockHeader, headerBuffer, dataBuffer);
+            if(compressionType == CompressionType.NONE) {
+                dataBlock = DataBlock.parseData(dataBlockHeader, headerBuffer, dataBuffer);
+            } else if(isWrapBuffer){
+                decompressed = decompress(compressionType, decompressed);
+                dataBlock = DataBlock.parseData(dataBlockHeader, headerBuffer, ByteBuffer.wrap(decompressed));
+            } else {
+                dataBuffer.get(decompressed, 0, decompressed.length);
+                decompressed = decompress(compressionType, decompressed);
+                dataBlock = DataBlock.parseData(dataBlockHeader, headerBuffer, ByteBuffer.wrap(decompressed));
+            }
+
         } else {
             dataBlock = DataBlock.parseData(dataBlockHeader, headerBuffer);
         }

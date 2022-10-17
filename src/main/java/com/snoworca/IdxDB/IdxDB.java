@@ -37,6 +37,8 @@ public class IdxDB {
         private int dataReaderCapacity = 3;
         private final static long version = 1;
 
+        private CompressionType compressionType = CompressionType.NONE;
+
         public IdxDBMaker(File file) {
             this.dbFile = file;
         }
@@ -47,11 +49,16 @@ public class IdxDB {
             return this;
         }
 
+        public IdxDBMaker compressionType(CompressionType compressionType) {
+            this.compressionType = compressionType;
+            return this;
+        }
 
         public IdxDB make() throws IOException {
             IdxDB idxDB = new IdxDB();
             DataIOConfig dataIOConfig = new DataIOConfig();
             dataIOConfig.setReaderCapacity(dataReaderCapacity);
+            dataIOConfig.setCompressionType(compressionType);
             boolean existDBFile = dbFile.isFile() && dbFile.length() > 0;
             idxDB.dataIO = new DataIO(dbFile, dataIOConfig);
             idxDB.dataIO.open();

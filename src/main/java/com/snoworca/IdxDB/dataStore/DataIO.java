@@ -1,6 +1,7 @@
 package com.snoworca.IdxDB.dataStore;
 
 
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.exception.AccessOutOfRangePositionDataException;
 import com.snoworca.IdxDB.util.NumberBufferConverter;
 
@@ -22,6 +23,8 @@ public class DataIO {
     private DataIOConfig config;
     private AtomicInteger availableReaders = new AtomicInteger(0);
 
+    private CompressionType compressionType = CompressionType.NONE;
+
 
 
     public DataIO(File file) {
@@ -30,10 +33,12 @@ public class DataIO {
 
 
     public DataIO(File file,DataIOConfig config) {
+        compressionType = config.getCompressionType();
         this.file = file;
-        dataWriter = new DataWriter(file);
+        dataWriter = new DataWriter(file,compressionType);
         this.config = config;
         availableReaders.set(this.config.getReaderCapacity());
+
     }
 
 
@@ -129,19 +134,12 @@ public class DataIO {
         }
         DataBlock dataBlock = get(pos);
         DataBlockHeader dataBlockHeader = dataBlock.getHeader();
-        int originLen = dataBlockHeader.getLength();
         int capacity = dataBlockHeader.getCapacity();
-        if(originLen == buffer.length) {
-            dataWriter.replace(pos + DataBlockHeader.HEADER_SIZE, buffer);
-            dataBlock.changeData(buffer);
-            return dataBlock;
-        } else if(capacity <  buffer.length) {
+        if(capacity <  buffer.length) {
             unlink(pos);
             return write(buffer, capacityRatio);
         }
-        dataWriter.replace(pos + DataBlockHeader.HEADER_IDX_LEN, NumberBufferConverter.fromInt(buffer.length));
-        dataWriter.replace(pos + DataBlockHeader.HEADER_SIZE, buffer);
-        dataBlock.changeData(buffer);
+        dataWriter.changeData(dataBlock, buffer);
         return dataBlock;
     }
 
@@ -268,6 +266,7 @@ public class DataIO {
     }
     private DataBlock write(DataBlock dataBlock) throws IOException {
         try {
+            dataBlock.getHeader().setCompressionType(compressionType);
             dataWriter.write(dataBlock);
             return dataBlock;
         } catch (IOException | RuntimeException e) {
