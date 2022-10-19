@@ -139,6 +139,7 @@ public class DataWriter {
             isLock = false;
             lock.unlock();
         }
+        unlink(pos);
         return write(dataBlock.getCollectionId(), buffer, true);
     }
 
