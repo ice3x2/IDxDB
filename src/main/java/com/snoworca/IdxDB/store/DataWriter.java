@@ -94,16 +94,9 @@ public class DataWriter {
         lock.unlock();
     }
 
-    public void replace(long pos, byte[] buffer) throws IOException {
-        lock.lock();
-        isLock = true;
-        try {
-            randomAccessFile.seek(pos);
-            writeChannel.write(ByteBuffer.wrap(buffer));
-        } finally {
-            isLock = false;
-            lock.unlock();
-        }
+    private void replace(long pos, byte[] buffer) throws IOException {
+        randomAccessFile.seek(pos);
+        writeChannel.write(ByteBuffer.wrap(buffer));
     }
 
     public long changeData(DataBlock dataBlock, byte[] buffer) throws IOException {
@@ -112,18 +105,15 @@ public class DataWriter {
         try {
             long pos = dataBlock.getPosition();
             buffer = compress(buffer);
-            if(buffer.length <= dataBlock.getHeader().getCapacity()) {
+            if(pos > -1 && buffer.length <= dataBlock.getHeader().getCapacity()) {
                 replace(pos + DataBlockHeader.HEADER_SIZE, buffer);
-            } else {
-                lock.unlock();
-                dataBlock.setData(buffer);
+                return pos;
             }
-            dataBlock.setData(buffer);
-
         } finally {
             isLock = false;
             lock.unlock();
         }
+        return write(dataBlock.getCollectionId(), buffer, );
     }
 
     public long write(int collectionID,byte[] buffer,float capacityRatio) throws IOException {
@@ -131,6 +121,10 @@ public class DataWriter {
         int capacity = (int)(buffer.length * (capacityRatio + 1.0f));
         DataBlock dataBlock = new DataBlock();
         dataBlock.setHeader(new DataBlockHeader(collectionID,capacity, (byte)compressionType.getValue()));
+        if(capacity > buffer.length) {
+            byte[] newBuffer = new byte[capacity];
+            System.arraycopy(buffer,0,newBuffer,0,buffer.length);
+        }
         dataBlock.setData(buffer);
         write(dataBlock);
         return dataBlock.getPosition();
@@ -140,16 +134,10 @@ public class DataWriter {
         lock.lock();
         isLock = true;
         try {
-            block.toBytes()
-
-            writeChannel.write(ByteBuffer.wrap(block));
-            this.dataLength.addAndGet(DataBlockHeader.HEADER_SIZE);
-
-            byte[] dataBuffer = block.getPayload();;
-            dataBuffer = compress(dataBuffer);
+            byte[] buffer = block.toBytes();
             randomAccessFile.seek(this.dataLength.get());
-            writeChannel.write(ByteBuffer.wrap(dataBuffer));
-            this.dataLength.addAndGet(dataBuffer.length);
+            writeChannel.write(ByteBuffer.wrap(buffer));
+            this.dataLength.addAndGet(buffer.length);
         } finally {
             isLock = false;
             lock.unlock();
