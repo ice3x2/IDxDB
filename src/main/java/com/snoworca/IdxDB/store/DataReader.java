@@ -95,12 +95,11 @@ public class DataReader {
         }
         headerBuffer.flip();
         DataBlockHeader dataBlockHeader = DataBlockHeader.fromByteBuffer(headerBuffer);
-        returnBuffer(headerBuffer);
         byte compressionByteType = dataBlockHeader.getCompressionType();
         CompressionType compressionType = CompressionType.fromValue(compressionByteType);
         int capacity = dataBlockHeader.getCapacity();
         DataBlock dataBlock = null;
-        if(dataBlockHeader.getCapacity() >= headerBuffer.remaining()) {
+        if(dataBlockHeader.getCapacity() <= headerBuffer.remaining()) {
             if(compressionType == CompressionType.NONE) {
                 dataBlock = DataBlock.fromByteBuffer(dataBlockHeader, headerBuffer);
             } else {
@@ -111,17 +110,18 @@ public class DataReader {
             }
             returnBuffer(headerBuffer);
         } else {
-            int arraySize = capacity / (cachedBufferSize + DataBlockHeader.HEADER_SIZE);
-            arraySize = Math.max(arraySize, 1);
+            int totalReadSize = capacity + DataBlockHeader.HEADER_SIZE;
+            int arraySize = (totalReadSize / cachedBufferSize) + (totalReadSize % cachedBufferSize > 0 ? 1 : 0);
             ByteBuffer[] byteBuffers = new ByteBuffer[arraySize];
             byteBuffers[0] = headerBuffer;
             for(int i = 1, n = byteBuffers.length;i < n; ++i) {
                 byteBuffers[i] = getBuffer();
             }
-            fileChannel.read(byteBuffers, 0, arraySize - 1);
+            fileChannel.read(byteBuffers, 1, arraySize - 1);
             for(int i = 1, n = byteBuffers.length;i < n; ++i) {
                 byteBuffers[i].flip();
             }
+            byteBuffers[0].position(DataBlockHeader.HEADER_SIZE);
             if(compressionType == CompressionType.NONE) {
                 dataBlock = DataBlock.fromByteBuffers(dataBlockHeader,byteBuffers);
                 dataBlock.setPosition(currentPos);

@@ -2,7 +2,6 @@ package com.snoworca.IdxDB.store;
 
 import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.exception.AccessOutOfRangePositionDataException;
-import com.snoworca.IdxDB.util.NumberBufferConverter;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,29 +11,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DataStore {
 
-    private File file;
-    private LinkedList<DataReader> dataReaderDeque = new LinkedList<>();
+    private final File file;
+    private final LinkedList<DataReader> dataReaderDeque = new LinkedList<>();
     private final Object dataReaderDequeMonitor = new Object();
-    private DataWriter dataWriter;
-    private DataIOConfig config;
-    private AtomicInteger availableReaders = new AtomicInteger(0);
-
-    private CompressionType compressionType = CompressionType.NONE;
-
+    private final DataWriter dataWriter;
+    private final DataStoreOptions config;
+    private final AtomicInteger availableReaders = new AtomicInteger(0);
 
 
     public DataStore(File file) {
-        this(file, new DataIOConfig());
+        this(file, new DataStoreOptions());
     }
 
 
-    public DataStore(File file,DataIOConfig config) {
-        compressionType = config.getCompressionType();
+    public DataStore(File file, DataStoreOptions config) {
+        CompressionType compressionType = config.getCompressionType();
         this.file = file;
-        dataWriter = new DataWriter(file,compressionType);
+        float capacityRatio = config.getCapacityRatio();
+        dataWriter = new DataWriter(file, capacityRatio, compressionType);
         this.config = config;
-        availableReaders.set(this.config.getReaderCapacity());
-
+        availableReaders.set(this.config.getReaderSize());
     }
 
 
@@ -48,7 +44,7 @@ public class DataStore {
 
     private void initDataReaders() throws IOException {
         synchronized (dataReaderDequeMonitor) {
-            for (int i = 0, n = config.getReaderCapacity(); i < n; ++i) {
+            for (int i = 0, n = config.getReaderSize(); i < n; ++i) {
                 DataReader reader = new DataReader(file);
                 reader.open();
                 dataReaderDeque.add(reader);
@@ -80,6 +76,7 @@ public class DataStore {
     }
 
     public DataBlock get(long pos) throws IOException {
+        //noinspection DuplicatedCode
         if(pos < 0) return null;
         long fileLength = dataWriter.length();
         if(pos >= fileLength) {
@@ -87,9 +84,6 @@ public class DataStore {
         }
         DataReader reader = obtainDataReader();
         try {
-            if(pos >= fileLength) {
-                return null;
-            }
             reader.seek(pos);
             DataBlock dataBlock = null;
             try {
@@ -105,31 +99,31 @@ public class DataStore {
         }
     }
 
-
-
-    public DataBlock writeOrReplace(byte[] buffer, long pos, float capacityRatio) throws IOException {
-        if(pos < 0) {
-            return write(buffer, capacityRatio);
-        }
-        DataBlock dataBlock = get(pos);
-        DataBlockHeader dataBlockHeader = dataBlock.getHeader();
-        int capacity = dataBlockHeader.getCapacity();
-        if(capacity <  buffer.length) {
-            unlink(pos);
-            return write(buffer, capacityRatio);
-        }
-        dataWriter.changeData(dataBlock, buffer);
-        return dataBlock;
+    public byte[] getData(long pos) throws IOException {
+        if(pos < 0) return null;
+        return get(pos).getData();
     }
 
-    public long write(byte[] buffer, float capacityRatio) throws IOException {
-        DataBlock block = dataWriter.write();
-        return block;
+
+
+    public long replaceOrWrite(int collectionID, byte[] buffer, long pos) throws IOException {
+        if(pos < 0) {
+            return write(collectionID, buffer);
+        }
+        DataBlock dataBlock = get(pos);
+        if(dataBlock == null) {
+            return write(collectionID, buffer);
+        }
+        return dataWriter.changeData(dataBlock, buffer).getPosition();
+    }
+
+    public long write(int collectionID, byte[] buffer) throws IOException {
+        DataBlock block = dataWriter.write(collectionID, buffer);
+        return block.getPosition();
     }
 
     public void unlink(long pos) throws IOException {
-
-
+         dataWriter.unlink(pos);
     }
 
 

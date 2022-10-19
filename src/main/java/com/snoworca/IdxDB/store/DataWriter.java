@@ -14,23 +14,25 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class DataWriter {
 
-    private File dataFile;
+    private final File dataFile;
     private RandomAccessFile randomAccessFile;
     private FileChannel writeChannel;
 
     private CompressionType compressionType = CompressionType.NONE;
 
-    private AtomicLong dataLength = new AtomicLong(0);
-    private AtomicLong fileSize = new AtomicLong(0);
+    private final AtomicLong dataLength = new AtomicLong(0);
+    private final AtomicLong fileSize = new AtomicLong(0);
+    private float capacityRatio = 0.3f;
 
-    private ReentrantLock lock = new ReentrantLock();
+    private final ReentrantLock lock = new ReentrantLock();
     private boolean isLock = false;
 
-    DataWriter(File file, CompressionType compressionType) {
+    DataWriter(File file,float capacityRatio,  CompressionType compressionType) {
         this.dataFile = file;
         this.dataLength.set(file.length());
         this.fileSize.set(file.length());
         this.compressionType = compressionType;
+        this.capacityRatio = capacityRatio;
     }
 
     public long length() {
@@ -43,6 +45,7 @@ public class DataWriter {
     public boolean writeable() {
         return isLock;
     }
+
 
 
     private byte[] compress(byte[] buffer) {
@@ -99,35 +102,66 @@ public class DataWriter {
         writeChannel.write(ByteBuffer.wrap(buffer));
     }
 
-    public long changeData(DataBlock dataBlock, byte[] buffer) throws IOException {
+    void unlink(long pos) throws IOException {
+        if(pos < 0) return;
         lock.lock();
         isLock = true;
         try {
-            long pos = dataBlock.getPosition();
-            buffer = compress(buffer);
-            if(pos > -1 && buffer.length <= dataBlock.getHeader().getCapacity()) {
+            randomAccessFile.seek(pos + DataBlockHeader.HEADER_COLLECTION_ID);
+            ByteBuffer buffer = ByteBuffer.allocate(4);
+            buffer.putInt(-1);
+            buffer.flip();
+            writeChannel.write(buffer);
+        } catch (IOException e) {
+            throw e;
+        } finally {
+            isLock = false;
+            lock.unlock();
+        }
+
+    }
+
+    DataBlock changeData(DataBlock dataBlock, byte[] buffer) throws IOException {
+        long pos = dataBlock.getPosition();
+        buffer = compress(buffer);
+        if(pos < 0) {
+            return write(dataBlock.getCollectionId(), buffer, true);
+        }
+        lock.lock();
+        isLock = true;
+        try {
+            if(buffer.length <= dataBlock.getHeader().getCapacity()) {
                 replace(pos + DataBlockHeader.HEADER_SIZE, buffer);
-                return pos;
+                dataBlock.setData(buffer);
+                return dataBlock;
             }
         } finally {
             isLock = false;
             lock.unlock();
         }
-        return write(dataBlock.getCollectionId(), buffer, );
+        return write(dataBlock.getCollectionId(), buffer, true);
     }
 
-    public long write(int collectionID,byte[] buffer,float capacityRatio) throws IOException {
-        buffer = compress(buffer);
+
+    DataBlock write(int collectionID,byte[] buffer) throws IOException {
+        return write(collectionID, buffer, false);
+    }
+
+    private DataBlock write(int collectionID,byte[] buffer, boolean compressed) throws IOException {
+        if(!compressed) {
+            buffer = compress(buffer);
+        }
         int capacity = (int)(buffer.length * (capacityRatio + 1.0f));
         DataBlock dataBlock = new DataBlock();
         dataBlock.setHeader(new DataBlockHeader(collectionID,capacity, (byte)compressionType.getValue()));
         if(capacity > buffer.length) {
             byte[] newBuffer = new byte[capacity];
             System.arraycopy(buffer,0,newBuffer,0,buffer.length);
+            buffer = newBuffer;
         }
         dataBlock.setData(buffer);
         write(dataBlock);
-        return dataBlock.getPosition();
+        return dataBlock;
     }
 
     private void write(DataBlock block) throws IOException {
@@ -137,6 +171,7 @@ public class DataWriter {
             byte[] buffer = block.toBytes();
             randomAccessFile.seek(this.dataLength.get());
             writeChannel.write(ByteBuffer.wrap(buffer));
+            block.setPosition(this.dataLength.get());
             this.dataLength.addAndGet(buffer.length);
         } finally {
             isLock = false;
