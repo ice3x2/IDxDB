@@ -26,7 +26,7 @@ public class DataWriter {
     private final ReentrantLock lock = new ReentrantLock();
     private boolean isLock = false;
 
-    private EmptyBlockPositionPool emptyBlockPositionPool;
+    private final EmptyBlockPositionPool emptyBlockPositionPool;
 
     DataWriter(File file,float capacityRatio,  CompressionType compressionType, EmptyBlockPositionPool emptyBlockPositionPool) {
         this.dataFile = file;
@@ -38,6 +38,9 @@ public class DataWriter {
     }
 
 
+    ReentrantLock getLock() {
+        return lock;
+    }
 
     public long length() {
         return dataLength.get();
@@ -113,7 +116,7 @@ public class DataWriter {
         try {
             randomAccessFile.seek(pos + DataBlockHeader.HEADER_COLLECTION_ID);
             ByteBuffer buffer = ByteBuffer.allocate(4);
-            buffer.putInt(-1);
+            buffer.putInt(DataBlockHeader.DELETED_ID);
             buffer.flip();
             writeChannel.write(buffer);
             emptyBlockPositionPool.offer(pos,capacity);
@@ -158,7 +161,15 @@ public class DataWriter {
             buffer = compress(buffer);
         }
         int capacity = (int)(buffer.length * (capacityRatio + 1.0f));
-        EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo = emptyBlockPositionPool.obtain(capacity);
+        lock.lock();
+        isLock = true;
+        EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo;
+        try {
+            emptyBlockInfo = emptyBlockPositionPool.obtain(capacity);
+        } finally {
+            isLock = false;
+            lock.unlock();
+        }
         if(emptyBlockInfo != null) {
             long pos = emptyBlockInfo.getPosition();
             DataBlockHeader header =  new DataBlockHeader(collectionID, emptyBlockInfo.getCapacity(), (byte)compressionType.getValue());

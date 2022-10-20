@@ -6,8 +6,17 @@ public class DataStoreOptions {
     private int readerSize = 3;
     private CompressionType compressionType;
     private float capacityRatio = 0.3f;
+
+    private int iterableBufferSize = 1024 * 1024 * 32;
+
+
     public DataStoreOptions() {
 
+    }
+
+    public DataStoreOptions setIterableBufferSize(int iterableBufferSize) {
+        this.iterableBufferSize = iterableBufferSize;
+        return this;
     }
 
     public DataStoreOptions setCapacityRatio(float capacityRatio) {
@@ -23,6 +32,10 @@ public class DataStoreOptions {
     public DataStoreOptions setCompressionType(CompressionType compressionType) {
         this.compressionType = compressionType;
         return this;
+    }
+
+    public int getIterableBufferSize() {
+        return iterableBufferSize;
     }
 
     public CompressionType getCompressionType() {

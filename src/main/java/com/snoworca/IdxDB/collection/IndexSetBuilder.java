@@ -3,28 +3,32 @@ package com.snoworca.IdxDB.collection;
 import com.snoworca.IdxDB.CollectionCreateCallback;
 import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataStore;
 
 import java.util.concurrent.locks.ReentrantLock;
 
 public class IndexSetBuilder {
 
     private IndexSetOption indexSetOption = null;
-    private DataIO dataIO;
+    private DataStore dataStore;
 
     private ReentrantLock createLock;
     private CollectionCreateCallback callback;
 
-    public IndexSetBuilder(CollectionCreateCallback callback, DataIO dataIO, String name, ReentrantLock createLock) {
-        this.dataIO = dataIO;
+    private int collectionID;
+
+    public IndexSetBuilder(CollectionCreateCallback callback,int id, DataStore dataStore, String name, ReentrantLock createLock) {
+        this.dataStore = dataStore;
         this.createLock = createLock;
         this.callback = callback;
         this.indexSetOption = new IndexSetOption(name);
+        this.collectionID =id;
     }
 
 
 
 
-    IndexSetBuilder(String name, DataIO dataIO) {
+    IndexSetBuilder(String name, DataStore dataStore) {
         indexSetOption = new IndexSetOption(name);
     }
 
@@ -62,7 +66,7 @@ public class IndexSetBuilder {
 
 
     public IndexTreeSet create() {
-        IndexTreeSet indexTreeSet = new IndexTreeSet(dataIO, indexSetOption);
+        IndexTreeSet indexTreeSet = new IndexTreeSet(collectionID, dataStore, indexSetOption);
         createLock.lock();
         this.callback.onCreate(indexTreeSet);
         createLock.unlock();

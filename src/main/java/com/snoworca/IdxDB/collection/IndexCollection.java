@@ -50,6 +50,8 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     long findIndexPos(Object indexValue);
 
+    public int getID();
+
 
 
 

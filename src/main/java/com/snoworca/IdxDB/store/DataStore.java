@@ -8,25 +8,38 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
-public class DataStore {
+public class DataStore implements Iterable<DataBlock> {
 
     private final File file;
     private final LinkedList<DataReader> dataReaderDeque = new LinkedList<>();
     private final Object dataReaderDequeMonitor = new Object();
     private final DataWriter dataWriter;
     private final DataStoreOptions config;
-    private final AtomicInteger availableReaders = new AtomicInteger(0);
 
-    private EmptyBlockPositionPool emptyBlockPositionPool = new EmptyBlockPositionPool();
+    private final EmptyBlockPositionPool emptyBlockPositionPool = new EmptyBlockPositionPool();
 
     public DataStore(File file) {
         this(file, new DataStoreOptions());
     }
 
 
+    int getEmptyBlockPositionPoolSize() {
+        ReentrantLock lock = dataWriter.getLock();
+        lock.lock();
+        try {
+            return emptyBlockPositionPool.size();
+        }finally {
+            lock.unlock();
+        }
+
+    }
+
+
     public DataStore(File file, DataStoreOptions config) {
         CompressionType compressionType = config.getCompressionType();
+        AtomicInteger availableReaders = new AtomicInteger(0);
         this.file = file;
         float capacityRatio = config.getCapacityRatio();
         dataWriter = new DataWriter(file, capacityRatio, compressionType, emptyBlockPositionPool);
@@ -123,6 +136,13 @@ public class DataStore {
         return block;
     }
 
+
+    public void unlink(long pos) throws IOException {
+        DataBlock dataBlock = get(pos);
+        if(dataBlock == null) return;
+        dataWriter.unlink(pos, dataBlock.getCapacity());
+    }
+
     public void unlink(long pos, int capacity) throws IOException {
          dataWriter.unlink(pos, capacity);
     }
@@ -147,4 +167,8 @@ public class DataStore {
     }
 
 
+    @Override
+    public Iterator<DataBlock> iterator() {
+        return new DataStoreIterator(file, this.config.getIterableBufferSize(),emptyBlockPositionPool,  dataWriter.getLock());
+    }
 }

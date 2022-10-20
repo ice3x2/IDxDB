@@ -1,15 +1,18 @@
 package com.snoworca.IdxDB.store;
 
-import java.util.ArrayDeque;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 public class EmptyBlockPositionPool {
 
+
+    private final TreeSet<Long> emptyBlockPositionSet = new TreeSet<>();
     private final TreeMap<Integer, ArrayDeque<EmptyBlockInfo>> emptyBlockPositionMap = new TreeMap<>();
     private final float limitRatio;
     private final boolean isLimitRatio;
 
+    public int size() {
+        return emptyBlockPositionSet.size();
+    }
 
     public EmptyBlockPositionPool() {
         this(0);
@@ -26,13 +29,20 @@ public class EmptyBlockPositionPool {
         offer(emptyBlockInfo);
     }
 
+    public boolean contains(long position) {
+        return emptyBlockPositionSet.contains(position);
+    }
+
+
     public void offer(EmptyBlockInfo emptyBlockInfo) {
         int capacity = emptyBlockInfo.capacity;
+        if(contains(emptyBlockInfo.getPosition())) return;
         ArrayDeque<EmptyBlockInfo> emptyBlockPositionList = emptyBlockPositionMap.get(capacity);
         if (emptyBlockPositionList == null) {
             emptyBlockPositionList = new ArrayDeque<>();
             emptyBlockPositionMap.put(capacity, emptyBlockPositionList);
         }
+        emptyBlockPositionSet.add(emptyBlockInfo.getPosition());
         emptyBlockPositionList.offer(emptyBlockInfo);
     }
 
@@ -57,6 +67,7 @@ public class EmptyBlockPositionPool {
         if(emptyBlockPositionList.isEmpty()) {
             emptyBlockPositionMap.remove(entry.getKey());
         }
+        emptyBlockPositionSet.remove(emptyBlockInfo.getPosition());
         return emptyBlockInfo;
     }
 

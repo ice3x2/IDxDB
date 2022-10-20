@@ -1,14 +1,17 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 public interface StoreDelegator {
 
-        public long storeData(long pos,Object index, CSONObject csonObject);
-        public CSONArray loadIndex(long pos);
+        public StoredInfo storeData(long pos, CSONObject csonObject);
 
-        public CSONObject loadData(long pos);
+        public StoredInfo loadData(long pos);
+
+
+
 
 
 }

@@ -19,9 +19,15 @@ public class DataBlockHeader {
 
     public final static byte PREFIX = 'X';
 
+    public final static int DELETED_ID = -1;
+
     private int collectionId = 0;
     private int capacity = 0;
     private byte compressionType = 0;
+
+    public boolean isDeleted() {
+        return collectionId == DELETED_ID;
+    }
 
     public DataBlockHeader(int collectionId, int capacity, byte compressionType) {
         this.collectionId = collectionId;

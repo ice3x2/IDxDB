@@ -317,7 +317,7 @@ public class CSONObject extends CSONElement {
 		return stringBuilder.toString();
 	}
 
-	public byte[] toByteArray() {
+	public byte[] toBytes() {
 		CSONWriter writer = new CSONWriter();
 		write(writer);
 		return writer.toByteArray();

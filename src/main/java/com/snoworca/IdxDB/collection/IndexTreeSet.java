@@ -3,6 +3,7 @@ package com.snoworca.IdxDB.collection;
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
@@ -20,8 +21,8 @@ public class IndexTreeSet extends IndexCollectionBase {
     private boolean isMemCacheIndex;
 
 
-    public IndexTreeSet(DataIO dataIO, IndexSetOption option) {
-        super(dataIO, option);
+    public IndexTreeSet(int id, DataStore dataStore, IndexSetOption option) {
+        super(id, dataStore, option);
         this.indexKey = super.getIndexKey();
         this.storeDelegator = super.getStoreDelegator();
         this.indexSort = super.getSort();

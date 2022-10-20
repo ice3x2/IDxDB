@@ -1,7 +1,7 @@
 package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.IdxDB.util.CusLinkedHashMap;
 import com.snoworca.cson.CSONObject;
 
@@ -23,9 +23,8 @@ public class IndexLinkedMap extends IndexCollectionBase {
     private int memCacheSize;
     private boolean isReverse;
 
-    public IndexLinkedMap(DataIO dataIO, IndexMapOption collectionOption) {
-        super(dataIO, collectionOption);
-
+    public IndexLinkedMap(int id, DataStore dataStore, IndexMapOption collectionOption) {
+        super(id, dataStore, collectionOption);
     }
 
     @Override
