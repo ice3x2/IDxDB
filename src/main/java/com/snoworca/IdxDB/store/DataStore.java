@@ -18,6 +18,7 @@ public class DataStore {
     private final DataStoreOptions config;
     private final AtomicInteger availableReaders = new AtomicInteger(0);
 
+    private EmptyBlockPositionPool emptyBlockPositionPool = new EmptyBlockPositionPool();
 
     public DataStore(File file) {
         this(file, new DataStoreOptions());
@@ -28,7 +29,7 @@ public class DataStore {
         CompressionType compressionType = config.getCompressionType();
         this.file = file;
         float capacityRatio = config.getCapacityRatio();
-        dataWriter = new DataWriter(file, capacityRatio, compressionType);
+        dataWriter = new DataWriter(file, capacityRatio, compressionType, emptyBlockPositionPool);
         this.config = config;
         availableReaders.set(this.config.getReaderSize());
     }
@@ -106,7 +107,7 @@ public class DataStore {
 
 
 
-    public long replaceOrWrite(int collectionID, byte[] buffer, long pos) throws IOException {
+    public DataBlock replaceOrWrite(int collectionID, byte[] buffer, long pos) throws IOException {
         if(pos < 0) {
             return write(collectionID, buffer);
         }
@@ -114,17 +115,19 @@ public class DataStore {
         if(dataBlock == null) {
             return write(collectionID, buffer);
         }
-        return dataWriter.changeData(dataBlock, buffer).getPosition();
+        return dataWriter.changeData(dataBlock, buffer);
     }
 
-    public long write(int collectionID, byte[] buffer) throws IOException {
+    public DataBlock write(int collectionID, byte[] buffer) throws IOException {
         DataBlock block = dataWriter.write(collectionID, buffer);
-        return block.getPosition();
+        return block;
     }
 
-    public void unlink(long pos) throws IOException {
-         dataWriter.unlink(pos);
+    public void unlink(long pos, int capacity) throws IOException {
+         dataWriter.unlink(pos, capacity);
     }
+
+
 
 
 

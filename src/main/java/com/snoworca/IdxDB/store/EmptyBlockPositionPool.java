@@ -6,7 +6,7 @@ import java.util.TreeMap;
 
 public class EmptyBlockPositionPool {
 
-    private final TreeMap<Integer, ArrayDeque<DataBlock>> emptyBlockPositionMap = new TreeMap<>();
+    private final TreeMap<Integer, ArrayDeque<EmptyBlockInfo>> emptyBlockPositionMap = new TreeMap<>();
     private final float limitRatio;
     private final boolean isLimitRatio;
 
@@ -21,30 +21,30 @@ public class EmptyBlockPositionPool {
         this.limitRatio = limitRatio + 1.0f;
     }
 
+    public void offer(long position, int capacity) {
+        EmptyBlockInfo emptyBlockInfo = new EmptyBlockInfo(position, capacity);
+        offer(emptyBlockInfo);
+    }
 
-
-
-    public DataBlock push(DataBlock dataBlock) {
-        int capacity = dataBlock.getCapacity();
-
-        ArrayDeque<DataBlock> emptyBlockPositionList = emptyBlockPositionMap.get(capacity);
+    public void offer(EmptyBlockInfo emptyBlockInfo) {
+        int capacity = emptyBlockInfo.capacity;
+        ArrayDeque<EmptyBlockInfo> emptyBlockPositionList = emptyBlockPositionMap.get(capacity);
         if (emptyBlockPositionList == null) {
             emptyBlockPositionList = new ArrayDeque<>();
             emptyBlockPositionMap.put(capacity, emptyBlockPositionList);
         }
-        emptyBlockPositionList.offer(dataBlock);
-        return dataBlock;
+        emptyBlockPositionList.offer(emptyBlockInfo);
     }
 
     public boolean isEmpty() {
         return emptyBlockPositionMap.isEmpty();
     }
 
-    public DataBlock obtain(int capacity) {
+    public EmptyBlockInfo obtain(int capacity) {
         if(emptyBlockPositionMap.isEmpty()) {
             return null;
         }
-        Map.Entry<Integer, ArrayDeque<DataBlock>> entry = emptyBlockPositionMap.ceilingEntry(capacity);
+        Map.Entry<Integer, ArrayDeque<EmptyBlockInfo>> entry = emptyBlockPositionMap.ceilingEntry(capacity);
         if(entry == null) {
             return null;
         }
@@ -52,12 +52,30 @@ public class EmptyBlockPositionPool {
         if(emptyBlockCapacity < capacity || (isLimitRatio && emptyBlockCapacity > capacity * limitRatio)) {
             return null;
         }
-        ArrayDeque<DataBlock> emptyBlockPositionList = entry.getValue();
-        DataBlock dataBlock = emptyBlockPositionList.pop();
+        ArrayDeque<EmptyBlockInfo> emptyBlockPositionList = entry.getValue();
+        EmptyBlockInfo emptyBlockInfo = emptyBlockPositionList.pop();
         if(emptyBlockPositionList.isEmpty()) {
             emptyBlockPositionMap.remove(entry.getKey());
         }
-        return dataBlock;
+        return emptyBlockInfo;
+    }
+
+    public static class EmptyBlockInfo {
+        private long pos;
+        private int capacity;
+
+        EmptyBlockInfo(long pos, int capacity) {
+            this.pos = pos;
+            this.capacity = capacity;
+        }
+
+        public long getPosition() {
+            return pos;
+        }
+
+        public int getCapacity() {
+            return capacity;
+        }
     }
 
 }

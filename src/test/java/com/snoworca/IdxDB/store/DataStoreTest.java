@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +39,7 @@ class DataStoreTest {
         dataStore.open();
         dataStore.write(1, getRandomString(100).getBytes());
         byte[] buffer = getRandomString(100).getBytes();
-        long pos = dataStore.write(1, buffer);
+        long pos = dataStore.write(1, buffer).getPosition();
         DataBlock readBuffer = dataStore.get(pos);
         byte[] readData = readBuffer.getData();
         for(int i = 0, n = buffer.length; i < n; ++i) {
@@ -59,7 +60,7 @@ class DataStoreTest {
         random.nextBytes(buffer);
         dataStore.write(1, buffer);
         random.nextBytes(buffer);
-        long pos = dataStore.write(1, buffer);
+        long pos = dataStore.write(1, buffer).getPosition();
         DataBlock readBuffer = dataStore.get(pos);
         byte[] readData = readBuffer.getData();
         for(int i = 0, n = buffer.length; i < n; ++i) {
@@ -78,7 +79,7 @@ class DataStoreTest {
         dataStore.open();
         dataStore.write(1, getRandomString(10000).getBytes());
         byte[] buffer = getRandomString(10000).getBytes();
-        long pos = dataStore.write(1, buffer);
+        long pos = dataStore.write(1, buffer).getPosition();
         DataBlock readBuffer = dataStore.get(pos);
         byte[] readData = readBuffer.getData();
         for(int i = 0, n = buffer.length; i < n; ++i) {
@@ -97,12 +98,24 @@ class DataStoreTest {
         dataStore.open();
         dataStore.write(1, getRandomString(10000).getBytes());
         byte[] buffer = getRandomString(10000).getBytes();
-        long pos = dataStore.write(100, buffer);
+        DataBlock dataBlock = dataStore.write(100, buffer);
+        long pos = dataBlock.getPosition();
+        int capacity = dataBlock.getCapacity();
         DataBlock readBuffer = dataStore.get(pos);
         assertEquals(100, readBuffer.getCollectionId());
-        dataStore.unlink(pos);
+        dataStore.unlink(pos, dataBlock.getCapacity());
         readBuffer = dataStore.get(pos);
         assertEquals(-1, readBuffer.getCollectionId());
+
+        byte[] newData = new byte[]{1,2,3,4,5,6,7,8,9,10};
+        dataBlock = dataStore.write(100, newData);
+        dataBlock = dataStore.get(dataBlock.getPosition());
+        assertEquals(pos, dataBlock.getPosition());
+        assertEquals(capacity, dataBlock.getCapacity());
+        assertEquals(100, dataBlock.getCollectionId());
+        for(int i = 0; i < newData.length; ++i) {
+            assertEquals(newData[i], dataBlock.getData()[i]);
+        }
         dataStore.close();
         file.delete();
 
@@ -119,14 +132,14 @@ class DataStoreTest {
         Random random = new Random(System.currentTimeMillis());
         dataStore.write(1, getRandomString(random.nextInt(10000) + 1).getBytes());
         byte[] buffer = getRandomString(10000).getBytes();
-        long pos = dataStore.write(1, buffer);
+        long pos = dataStore.write(1, buffer).getPosition();
         DataBlock readBlock = dataStore.get(pos);
         byte[] readData = readBlock.getData();
         for(int i = 0, n = buffer.length; i < n; ++i) {
             assertEquals(buffer[i], readData[i]);
         }
         buffer = getRandomString(13000).getBytes();
-        long changePos = dataStore.replaceOrWrite(1, buffer, readBlock.getPosition());
+        long changePos = dataStore.replaceOrWrite(1, buffer, readBlock.getPosition()).getPosition();
         assertEquals(pos,changePos);
 
         readBlock = dataStore.get(changePos);
