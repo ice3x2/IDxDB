@@ -8,6 +8,14 @@ public class DataBlock {
     private byte[] data;
     private long position  = -1;
 
+    private DataBlock() {
+
+    }
+
+    protected DataBlock(DataBlockHeader header) {
+        this.header = header;
+
+    }
 
 
 
@@ -19,9 +27,7 @@ public class DataBlock {
         return data;
     }
 
-    public void setHeader(DataBlockHeader header) {
-        this.header = header;
-    }
+
 
     public void setData(byte[] data) {
         this.data = data;
@@ -61,8 +67,7 @@ public class DataBlock {
     }
 
     public static DataBlock fromByteBuffer(DataBlockHeader header, byte[] buffer) {
-        DataBlock dataBlock = new DataBlock();
-        dataBlock.setHeader(header);
+        DataBlock dataBlock = new DataBlock(header);
         dataBlock.setData(buffer);
         return dataBlock;
     }

@@ -153,8 +153,7 @@ public class DataWriter {
             buffer = compress(buffer);
         }
         int capacity = (int)(buffer.length * (capacityRatio + 1.0f));
-        DataBlock dataBlock = new DataBlock();
-        dataBlock.setHeader(new DataBlockHeader(collectionID,capacity, (byte)compressionType.getValue()));
+        DataBlock dataBlock = new DataBlock(new DataBlockHeader(collectionID,capacity, (byte)compressionType.getValue()));
         if(capacity > buffer.length) {
             byte[] newBuffer = new byte[capacity];
             System.arraycopy(buffer,0,newBuffer,0,buffer.length);
