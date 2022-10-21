@@ -23,6 +23,8 @@ public class IndexLinkedMap extends IndexCollectionBase {
     private int memCacheSize;
     private boolean isReverse;
 
+    private boolean isMemCacheIndex;
+
     public IndexLinkedMap(int id, DataStore dataStore, IndexMapOption collectionOption) {
         super(id, dataStore, collectionOption);
     }
@@ -34,6 +36,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
         itemHashCacheMap = new CusLinkedHashMap<>(isAccessOrder);
         memCacheSize = collectionOption.getMemCacheSize();
         isReverse = collectionOption.getIndexSort() < 0;
+        isMemCacheIndex =  collectionOption.isMemCacheIndex();
     }
 
     @Override
@@ -429,5 +432,19 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
             }
         };
+    }
+
+    @Override
+    public void restore(StoredInfo info) {
+        CSONObject csonObject = info.getCsonObject();
+        CSONItem csonItem = new CSONItem(getStoreDelegator(), csonObject,getIndexKey(), getSort(), isMemCacheIndex);
+        csonItem.setStoreCapacity(info.getCapacity());
+        csonItem.setStoragePos_(info.getPosition());
+        itemHashMap_.put(IndexValue.newIndexValueItem(csonItem), csonItem);
+    }
+
+    @Override
+    public void end() {
+        onMemStore();
     }
 }

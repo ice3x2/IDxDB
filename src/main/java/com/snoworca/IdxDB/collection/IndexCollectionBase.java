@@ -4,7 +4,6 @@ import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.IdxDB.store.DataStore;
-import com.snoworca.IdxDB.util.NumberBufferConverter;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
@@ -12,7 +11,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public abstract class IndexCollectionBase implements IndexCollection {
+public abstract class IndexCollectionBase implements IndexCollection, Restorable {
 
     private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     private ReentrantReadWriteLock readWriteTransactionTempLock = new ReentrantReadWriteLock();

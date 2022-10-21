@@ -52,7 +52,4 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     public int getID();
 
-
-
-
 }

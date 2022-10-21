@@ -2,7 +2,7 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.cson.CSONObject;
 
-class StoredInfo  {
+public class StoredInfo  {
     private long position;
     private int capacity;
     private CSONObject csonObject;

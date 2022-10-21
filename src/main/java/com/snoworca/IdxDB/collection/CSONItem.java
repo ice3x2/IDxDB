@@ -51,6 +51,10 @@ class CSONItem implements Comparable<CSONItem> {
         return csonObject;
     }
 
+    public void setStoreCapacity(int storeCapacity) {
+        this.storeCapacity = storeCapacity;
+    }
+
     public int getStoreCapacity() {
         return storeCapacity;
     }

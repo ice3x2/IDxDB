@@ -455,4 +455,18 @@ public class IndexTreeSet extends IndexCollectionBase {
             }
         };
     }
+
+    @Override
+    public void restore(StoredInfo info) {
+        CSONObject csonObject = info.getCsonObject();
+        CSONItem csonItem = new CSONItem(storeDelegator, csonObject,indexKey, indexSort, isMemCacheIndex);
+        csonItem.setStoreCapacity(info.getCapacity());
+        csonItem.setStoragePos_(info.getPosition());
+        itemSet.add(csonItem);
+    }
+
+    @Override
+    public void end() {
+        onMemStore();
+    }
 }

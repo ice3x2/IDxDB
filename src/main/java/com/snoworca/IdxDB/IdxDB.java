@@ -10,6 +10,8 @@ import com.snoworca.cson.CSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -76,34 +78,46 @@ public class IdxDB {
         }
 
         private void loadDB(IdxDB db) throws IOException {
-            /*DataBlock dataBlock = db.dataIO.get(0);
-            CSONObject csonObject = new CSONObject(dataBlock.getData());
-            db.createTime = csonObject.getLong("create");
-            //TODO type 확인하고 일치하지 않을경우 exception
-            long nextPos = dataBlock.getHeader().getNext();
-            loadCollections(db, nextPos);*/
-        }
-
-        private void loadCollections(IdxDB db, long collectionInfoPos) {
-            /*if(collectionInfoPos < 0) return;
-            Iterator<DataBlock> dataBlockIterator = db.dataIO.iterator(collectionInfoPos);
-            while(dataBlockIterator.hasNext()) {
-                DataBlock dataBlock = dataBlockIterator.next();
-                byte[] buffer = dataBlock.getData();
-                CSONObject csonObject = new CSONObject(buffer);
-                String name = csonObject.getString("name");
-                db.indexCollectionInfoStorePosMap.put(name, dataBlock.getPos());
-                if(IndexTreeSet.class.getName().equals(csonObject.getString("className"))) {
-                    IndexTreeSet indexTreeSet = new IndexTreeSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
-                } else if(IndexLinkedMap.class.getName().equals(csonObject.getString("className"))) {
-                    IndexLinkedMap indexLinkedMap = new IndexLinkedMap(db.dataIO, IndexMapOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
+             for(DataBlock dataBlock : db.dataStore) {
+                 int id = dataBlock.getCollectionId();
+                 if(id == DB_INFO_ID) {
+                     continue;
+                 } else if(id < START_ID){
+                     continue;
+                 }
+                 IndexCollection indexCollection = db.indexCollectionIDMap.get(id);
+                if(indexCollection != null) {
+                    CSONObject collectionOption = new CSONObject(dataBlock.getData());
+                    indexCollection = restoreIndexCollection(db, id, collectionOption);
+                    db.indexCollectionInfoStorePosMap.put(id, dataBlock.getPosition());
                 }
-            }*/
-
+                ((Restorable)indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
+             }
+             Collection<IndexCollection> indexCollections =  db.indexCollectionMap.values();
+             for(IndexCollection indexCollection : indexCollections) {
+                 ((Restorable)indexCollection).end();
+             }
         }
 
+        private IndexCollection restoreIndexCollection(IdxDB db,int id, CSONObject collectionOption) {
+
+            String className = collectionOption.optString("className");
+            IndexCollection indexCollection = null;
+            if(IndexTreeSet.class.getName().equals(className)) {
+                IndexTreeSet indexTreeSet = new IndexTreeSet(id, db.dataStore, IndexSetOption.fromCSONObject(collectionOption));
+                db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
+                indexCollection = indexTreeSet;
+            } else if(IndexLinkedMap.class.getName().equals(className)) {
+                IndexLinkedMap indexLinkedMap = new IndexLinkedMap(id, db.dataStore, IndexMapOption.fromCSONObject(collectionOption));
+                db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
+                indexCollection = indexLinkedMap;
+            }
+            if(indexCollection != null) {
+                db.indexCollectionIDMap.put(id, indexCollection);
+                db.indexCollectionMap.put(indexCollection.getName(), indexCollection);
+            }
+            return indexCollection;
+        }
 
 
         private void initDB(IdxDB db) throws IOException {
