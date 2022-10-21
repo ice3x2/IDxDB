@@ -2,7 +2,6 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.cson.CSONObject;
 

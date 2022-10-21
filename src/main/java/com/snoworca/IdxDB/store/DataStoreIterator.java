@@ -46,8 +46,8 @@ class DataStoreIterator implements Iterator<DataBlock> {
         }
     }
 
-    private void nextBufferRead() throws IOException {
-        if(isEnd) return;
+    private boolean nextBufferRead() throws IOException {
+        if(isEnd) return false;
         currentPosition = nextPosition - lastRemaining;
         lock.lock();
         try {
@@ -59,39 +59,52 @@ class DataStoreIterator implements Iterator<DataBlock> {
         } finally {
             lock.unlock();
         }
-    }
-
-    private DataBlock nextDataBlockAndNextBuffer() throws IOException {
-        nextBufferRead();
         if(byteBuffer.remaining() == 0) {
             isEnd = true;
-            return null;
+            return false;
         }
-        return nextDataBlock();
+        return true;
     }
 
-    private DataBlock nextDataBlock() throws IOException {
+
+
+
+    private DataBlockHeader nextHeaderBlock() throws IOException {
         int remaining = byteBuffer.remaining();
         lastRemaining = remaining;
         if(remaining < DataBlockHeader.HEADER_SIZE) {
-            return nextDataBlockAndNextBuffer();
+            if(!nextBufferRead()) return null;
+            return nextHeaderBlock();
         }
         DataBlockHeader dataBlockHeader = DataBlockHeader.fromByteBuffer(byteBuffer);
         int capacity = dataBlockHeader.getCapacity();
         remaining = byteBuffer.remaining();
         if(remaining < capacity) {
-            return nextDataBlockAndNextBuffer();
+            if(!nextBufferRead()) return null;
+            return nextHeaderBlock();
         }
-        if(dataBlockHeader.isDeleted()) {
+        return dataBlockHeader;
+    }
+
+
+    private DataBlock nextDataBlock() throws IOException {
+        DataBlockHeader dataBlockHeader = nextHeaderBlock();
+        if(dataBlockHeader == null) {
+            return null;
+        }
+        int capacity = dataBlockHeader.getCapacity();
+        while(dataBlockHeader.isDeleted()) {
             lock.lock();
             try {
-                emptyBlockPositionPool.offer(currentPosition, dataBlockHeader.getCapacity());
+                emptyBlockPositionPool.offer(currentPosition, capacity);
             } finally {
                 lock.unlock();
             }
             byteBuffer.position(byteBuffer.position() + capacity);
             currentPosition += DataBlockHeader.HEADER_SIZE + capacity;
-            return nextDataBlock();
+            dataBlockHeader = nextHeaderBlock();
+            if(dataBlockHeader == null) return null;
+            capacity = dataBlockHeader.getCapacity();
         }
         byte[] data = new byte[capacity];
         byteBuffer.get(data);

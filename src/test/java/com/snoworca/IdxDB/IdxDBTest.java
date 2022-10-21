@@ -66,6 +66,7 @@ class IdxDBTest {
     @Test
     public void fileStoreTest() throws IOException {
         File file = new File("fileStoreTest.dat");
+        file.delete();
         long start = System.currentTimeMillis();
         IdxDB idxDB = IdxDB.newMaker(file).make();
         int collectionSize = 20;
@@ -450,6 +451,7 @@ class IdxDBTest {
 
     }
 
+    /*
     @Test
     public void compressionTest() throws IOException {
         Random rand = new Random(System.currentTimeMillis());
@@ -519,7 +521,7 @@ class IdxDBTest {
 
         snappyDB = IdxDB.newMaker(file).compressionType(CompressionType.SNAPPY).make();
         file.delete();
-    }
+    }*/
 
 
 

@@ -2,7 +2,6 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CollectionCreateCallback;
 import com.snoworca.IdxDB.CompressionType;
-import com.snoworca.IdxDB.dataStore.DataIO;
 import com.snoworca.IdxDB.store.DataStore;
 
 import java.util.concurrent.locks.ReentrantLock;

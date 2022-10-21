@@ -59,7 +59,10 @@ public class EmptyBlockPositionPool {
             return null;
         }
         int emptyBlockCapacity =  entry.getKey();
-        if(emptyBlockCapacity < capacity || (isLimitRatio && emptyBlockCapacity > capacity * limitRatio)) {
+        if(emptyBlockCapacity < capacity) {
+            return null;
+        }
+        if(isLimitRatio && emptyBlockCapacity > capacity * limitRatio) {
             return null;
         }
         ArrayDeque<EmptyBlockInfo> emptyBlockPositionList = entry.getValue();

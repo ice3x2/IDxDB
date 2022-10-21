@@ -86,12 +86,14 @@ public class IdxDB {
                      continue;
                  }
                  IndexCollection indexCollection = db.indexCollectionIDMap.get(id);
-                if(indexCollection != null) {
+                if(indexCollection == null) {
                     CSONObject collectionOption = new CSONObject(dataBlock.getData());
                     indexCollection = restoreIndexCollection(db, id, collectionOption);
                     db.indexCollectionInfoStorePosMap.put(id, dataBlock.getPosition());
+                    continue;
                 }
-                ((Restorable)indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
+                ((Restorable) indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
+
              }
              Collection<IndexCollection> indexCollections =  db.indexCollectionMap.values();
              for(IndexCollection indexCollection : indexCollections) {

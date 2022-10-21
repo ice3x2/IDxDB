@@ -43,7 +43,7 @@ class CSONItem implements Comparable<CSONItem> {
     public CSONObject getCsonObject() {
         if(csonObject == null) {
             StoredInfo info = storeDelegator.loadData(dataPos);
-            if(!isStorageSaved) csonObject = info.getCsonObject();
+            csonObject = info.getCsonObject();
             storeCapacity = info.getCapacity();
             dataPos = info.getPosition();
             return csonObject;

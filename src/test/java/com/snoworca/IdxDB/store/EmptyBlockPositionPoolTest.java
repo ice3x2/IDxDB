@@ -48,12 +48,12 @@ class EmptyBlockPositionPoolTest {
     @Test
     public void limitRatioTest() {
         EmptyBlockPositionPool pool = new EmptyBlockPositionPool(1);
-        EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo = new EmptyBlockPositionPool.EmptyBlockInfo(100,10);
+        EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo = new EmptyBlockPositionPool.EmptyBlockInfo(10,10);
         pool.offer(emptyBlockInfo);
 
         emptyBlockInfo = new EmptyBlockPositionPool.EmptyBlockInfo(100,20);
         pool.offer(emptyBlockInfo);
-        emptyBlockInfo = new EmptyBlockPositionPool.EmptyBlockInfo(100,30);
+        emptyBlockInfo = new EmptyBlockPositionPool.EmptyBlockInfo(120,30);
         pool.offer(emptyBlockInfo);
 
 
@@ -61,6 +61,7 @@ class EmptyBlockPositionPoolTest {
         assertEquals(null, pool.obtain(5));
         assertEquals(20, pool.obtain(10).getCapacity());
         assertEquals(null, pool.obtain(10));
+
 
 
     }
