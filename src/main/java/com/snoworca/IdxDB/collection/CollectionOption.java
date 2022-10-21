@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.collection;
 
+
 import com.snoworca.cson.CSONObject;
 
 public class CollectionOption {
@@ -43,9 +44,17 @@ public class CollectionOption {
         this.option.put(key, value);
     }
 
-    public Object getOption(String key) {
-        return this.option.get(key);
+
+
+    public void setCapacityRatio(float ratio) {
+        if(ratio < 0) ratio = 0.0f;
+        toCsonObject().put("capacityRatio", ratio);
     }
+
+    public float getCapacityRatio() {
+        return toCsonObject().optFloat("capacityRatio", 0.3f);
+    }
+
 
 
     public void setMemCacheIndex(boolean enable) {
@@ -55,6 +64,7 @@ public class CollectionOption {
     public boolean isMemCacheIndex() {
         return toCsonObject().optBoolean("memCacheIndex", true);
     }
+
 
 
 

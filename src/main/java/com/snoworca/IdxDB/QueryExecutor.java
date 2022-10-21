@@ -2,8 +2,8 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
-import com.snoworca.IdxDB.collection.IndexMapBuilder;
 import com.snoworca.IdxDB.collection.IndexSetBuilder;
+import com.snoworca.IdxDB.collection.IndexMapBuilder;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
@@ -102,7 +102,7 @@ public class QueryExecutor {
 
     public static  CSONObject executeListMethod(IdxDB store, CSONObject argument) {
         String name = argument.optString("name");
-        int limit = argument.optInteger("memCacheSize", Integer.MAX_VALUE);
+        int limit = argument.optInteger("limit", Integer.MAX_VALUE);
         boolean revers = argument.optBoolean("revers", false);
 
         IndexCollection indexCollection = null;
@@ -236,7 +236,7 @@ public class QueryExecutor {
         }
         Object indexValue = where.opt(key);
         String op = where.optString("$op", "eq");
-        int limit = argument.optInteger("memCacheSize", Integer.MAX_VALUE);
+        int limit = argument.optInteger("limit", Integer.MAX_VALUE);
         FindOption findOption = new FindOption();
         findOption.setOp(OP.fromString(op));
 

@@ -1,7 +1,7 @@
 package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.IdxDB.util.CusLinkedHashMap;
 import com.snoworca.cson.CSONObject;
 
@@ -23,9 +23,10 @@ public class IndexLinkedMap extends IndexCollectionBase {
     private int memCacheSize;
     private boolean isReverse;
 
-    public IndexLinkedMap(DataIO dataIO, IndexMapOption collectionOption) {
-        super(dataIO, collectionOption);
+    private boolean isMemCacheIndex;
 
+    public IndexLinkedMap(int id, DataStore dataStore, IndexMapOption collectionOption) {
+        super(id, dataStore, collectionOption);
     }
 
     @Override
@@ -35,6 +36,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
         itemHashCacheMap = new CusLinkedHashMap<>(isAccessOrder);
         memCacheSize = collectionOption.getMemCacheSize();
         isReverse = collectionOption.getIndexSort() < 0;
+        isMemCacheIndex =  collectionOption.isMemCacheIndex();
     }
 
     @Override
@@ -84,7 +86,12 @@ public class IndexLinkedMap extends IndexCollectionBase {
             Iterator<Map.Entry<IndexValue,CSONItem>> iterator = itemHashCacheMap.entrySet(!isReverse).iterator();
             Map.Entry<IndexValue, CSONItem> entry = iterator.next();
             entry.getValue().setStore(true);
-            iterator.remove();
+            try {
+                iterator.remove();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
         }
 
     }
@@ -97,14 +104,6 @@ public class IndexLinkedMap extends IndexCollectionBase {
         boolean asc = getSort() > -1;
         Collection<CSONItem> values = itemHashMap_.values();
         for (CSONItem csonItem : values) {
-            if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
-                try {
-                    unlink(csonItem);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                csonItem.setStoragePos(-1);
-            }
             csonItem.storeIfNeed();
             if(asc) {
                 csonItem.setStore(count > memCacheLimit);
@@ -205,6 +204,12 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
     @Override
     public List<CSONObject> list(int limit, boolean reverse) {
+        return list(0, limit, reverse);
+
+    }
+
+    @Override
+    public List<CSONObject> list(int start, int limit, boolean reverse) {
         boolean asc = getSort() > -1;
         try {
             readLock();
@@ -213,22 +218,24 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
                 ArrayList<CSONItem> arrayList = new ArrayList<>(itemHashMap_.values());
                 Collections.reverse(arrayList);
-                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(arrayList, limit);
+                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,arrayList, limit);
                 return result;
             }
-            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemHashMap_.values(), limit);
+            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,itemHashMap_.values(), limit);
             return result;
         } finally {
             readUnlock();
         }
-
     }
 
-    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<CSONItem> CSONItems, int limit) {
+    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(int start,Collection<CSONItem> CSONItems, int limit) {
         int count = 0;
         ArrayList<CSONObject> csonObjects = new ArrayList<>();
         if(CSONItems instanceof ArrayList) {
             for(int i = 0, n = CSONItems.size(); i < n; ++i) {
+                if(i < start) {
+                    continue;
+                }
                 CSONItem item = ((ArrayList<CSONItem>) CSONItems).get(i);
                 if(count >= limit) {
                     break;
@@ -237,7 +244,12 @@ public class IndexLinkedMap extends IndexCollectionBase {
                 ++count;
             }
         } else {
+            int continueIdx = 0;
             for(CSONItem item : CSONItems) {
+                if(continueIdx < start) {
+                    ++continueIdx;
+                    continue;
+                }
                 if(count >= limit) {
                     break;
                 }
@@ -300,10 +312,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
                                 commitResult.incrementCountOfAdd();
                                 foundItemOfAddOrReplace = item;
                             } else {
-                                unlink(foundItemOfAddOrReplace);
-                                foundItemOfAddOrReplace.setStoragePos(-1);
-                                foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
-                                foundItemOfAddOrReplace.storeIfNeed();
+                                foundItemOfAddOrReplace.replace(addOrReplaceCsonObject);
                                 commitResult.incrementCountOfReplace();
                             }
                             addCache(memCacheSize, foundItemOfAddOrReplace);
@@ -313,10 +322,7 @@ public class IndexLinkedMap extends IndexCollectionBase {
                             Object indexValueForReplace = item.getIndexValue();
                             CSONItem foundItemOfReplace = itemHashMap_.getAndAccessOrder(IndexValue.newIndexValueCache(indexValueForReplace));
                             if (foundItemOfReplace != null) {
-                                unlink(foundItemOfReplace);
-                                foundItemOfReplace.setStoragePos(-1);
-                                foundItemOfReplace.setCsonObject(replaceCsonObject);
-                                foundItemOfReplace.storeIfNeed();
+                                foundItemOfReplace.replace(replaceCsonObject);
                                 commitResult.incrementCountOfReplace();
                                 addCache(memCacheSize, foundItemOfReplace);
                             }
@@ -350,6 +356,11 @@ public class IndexLinkedMap extends IndexCollectionBase {
         }
     }
 
+    @Override
+    public long findIndexPos(Object indexValue) {
+        CSONItem item = itemHashMap_.get(IndexValue.newIndexValueCache(indexValue));
+        return item != null ? item.getStoragePos() : -1;
+    }
 
 
     @Override
@@ -421,5 +432,19 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
             }
         };
+    }
+
+    @Override
+    public void restore(StoredInfo info) {
+        CSONObject csonObject = info.getCsonObject();
+        CSONItem csonItem = new CSONItem(getStoreDelegator(), csonObject,getIndexKey(), getSort(), isMemCacheIndex);
+        csonItem.setStoreCapacity(info.getCapacity());
+        csonItem.setStoragePos_(info.getPosition());
+        itemHashMap_.put(IndexValue.newIndexValueItem(csonItem), csonItem);
+    }
+
+    @Override
+    public void end() {
+        onMemStore();
     }
 }

@@ -1,28 +1,29 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.dataStore.DataBlock;
-import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataBlock;
+import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public abstract class IndexCollectionBase implements IndexCollection {
+public abstract class IndexCollectionBase implements IndexCollection, Restorable {
 
     private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     private ReentrantReadWriteLock readWriteTransactionTempLock = new ReentrantReadWriteLock();
     private ArrayList<TransactionOrder> transactionOrders = new ArrayList<>();
 
+    private int collectionID;
     private final int memCacheLimit;
-    private DataIO dataIO;
+    private DataStore dataStore;
     private String name;
     private LinkedHashSet<String> indexKeySet;
     private int memCacheSize;
-    private long lastDataStorePos = -1;
+    private long lastStorePos = -1;
     private StoreDelegator storeDelegator;
 
     private String indexKey;
@@ -31,11 +32,16 @@ public abstract class IndexCollectionBase implements IndexCollection {
 
     private boolean isMemCacheIndex = true;
 
+    private float capacityRatio = 0.3f;
+    private boolean isCapacityFixed = false;
 
     private CollectionOption collectionOption;
 
-    IndexCollectionBase(DataIO dataIO, CollectionOption collectionOption) {
-        this.dataIO = dataIO;
+    private CompressionType compressionType;
+
+    IndexCollectionBase(int id, DataStore dataStore, CollectionOption collectionOption) {
+        this.collectionID = id;
+        this.dataStore = dataStore;
         this.name = collectionOption.getName();
         this.memCacheSize = collectionOption.getMemCacheSize();
         this.indexKey = collectionOption.getIndexKey();
@@ -43,12 +49,13 @@ public abstract class IndexCollectionBase implements IndexCollection {
         this.memCacheLimit = collectionOption.getMemCacheSize();
         this.headPos = collectionOption.getHeadPos();
         this.isMemCacheIndex = collectionOption.isMemCacheIndex();
+        this.capacityRatio = collectionOption.getCapacityRatio();
+        this.isCapacityFixed = capacityRatio < 0.001f;
         onInit(collectionOption);
-        if (this.dataIO != null) {
+        if (this.dataStore != null) {
             makeStoreDelegatorImpl();
         }
         initData();
-
 
         this.collectionOption = collectionOption;
     }
@@ -71,6 +78,12 @@ public abstract class IndexCollectionBase implements IndexCollection {
         List<CSONObject> result = findByIndex(index, FindOption.fromOP(OP.eq), 1);
         if(result.isEmpty()) return null;
         return result.get(0);
+    }
+
+
+    @Override
+    public int getID() {
+        return collectionID;
     }
 
     @Override
@@ -137,16 +150,16 @@ public abstract class IndexCollectionBase implements IndexCollection {
 
 
     public CSONObject getOptionInfo() {
-        return new CSONObject(collectionOption.toCsonObject().toByteArray());
+        return new CSONObject(collectionOption.toCsonObject().toBytes());
     }
 
     private void initData() {
-        try {
+        /*try {
             if(headPos < 1) {
-                DataBlock headBlock = dataIO.write(new CSONObject().toByteArray());
-                lastDataStorePos = headPos = headBlock.getPos();
+                DataBlock headBlock = dataStore.write(new CSONObject().toByteArray());
+                lastStorePos = headPos = headBlock.getPos();
             } else {
-                Iterator<DataBlock> dataBlockIterator = dataIO.iterator(headPos);
+                Iterator<DataBlock> dataBlockIterator = dataStore.iterator(headPos);
                 boolean header = true;
                 while(dataBlockIterator.hasNext()) {
                     DataBlock dataBlock = dataBlockIterator.next();
@@ -154,31 +167,26 @@ public abstract class IndexCollectionBase implements IndexCollection {
                         header = false;
                         continue;
                     }
-                    byte[] buffer = dataBlock.getData();
-                    lastDataStorePos = dataBlock.getPos();
-                    CSONObject csonObject = new CSONObject(buffer);
-                    Object indexValue = csonObject.opt(indexKey);
-                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue == null ? 0 : indexValue, sort, isMemCacheIndex);
-
-                    csonItem.setStoragePos(lastDataStorePos);
+                    byte[] buffer = dataBlock.getPayload();
+                    lastStorePos = dataBlock.getPos();
+                    Object indexValue = indexFromBuffer(buffer).get(0);
+                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue, sort, isMemCacheIndex);
+                    csonItem.setStoragePos_(lastStorePos);
                     csonItem.setStore(true);
                     onRestoreCSONItem(csonItem);
                 }
-
                 onMemStore();
-
-
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }
+        }*/
     }
 
 
     protected boolean unlink(CSONItem item) throws IOException {
-        if(item == null || item.getStoragePos() < 0) return false;
-        if(dataIO != null) {
-            dataIO.unlink(item.getStoragePos());
+        if(item == null || !item.isStored()) return false;
+        if(dataStore != null) {
+            dataStore.unlink(item.getStoragePos(), item.getStoreCapacity());
         }
         return true;
     }
@@ -348,31 +356,39 @@ public abstract class IndexCollectionBase implements IndexCollection {
         return name;
     }
 
+
+
     protected StoreDelegator getStoreDelegator() {
         return storeDelegator;
     }
 
+
+
     protected void makeStoreDelegatorImpl() {
         storeDelegator = new StoreDelegator() {
+
             @Override
-            public long cache(byte[] buffer) {
+            public StoredInfo storeData(long pos, CSONObject csonObject) {
+                byte[] buffer = csonObject.toBytes();
+                DataBlock dataBlock;
                 try {
-                    DataBlock dataBlock = dataIO.write(buffer);
-                    long dataPos = dataBlock.getPos();
-                    dataIO.setNextPos(lastDataStorePos, dataPos);
-                    dataIO.setPrevPos(dataPos, lastDataStorePos);
-                    lastDataStorePos = dataPos;
-                    return dataPos;
+                    if (pos == -1) {
+                        dataBlock = dataStore.write(collectionID, buffer);
+                    } else {
+                        dataBlock = dataStore.replaceOrWrite(collectionID, buffer, pos);
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+                return new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity());
             }
 
+
             @Override
-            public byte[] load(long pos) {
+            public StoredInfo loadData(long pos) {
                 try {
-                    DataBlock dataBlock = dataIO.get(pos);
-                    return dataBlock.getData();
+                    DataBlock dataBlock = dataStore.get(pos);
+                    return new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData()));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

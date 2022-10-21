@@ -12,11 +12,17 @@ public class CSONObject extends CSONElement {
 
 	public CSONObject(byte[] buffer) {
 		super(ElementType.Object);
-
-
 		CSONObject csonObject = (CSONObject)CSONParser.parse(buffer);
 		this.mDataMap = csonObject.mDataMap;
 	}
+
+	public CSONObject(byte[] buffer, int offset, int length) {
+		super(ElementType.Object);
+		CSONObject csonObject = (CSONObject)CSONParser.parse(buffer, offset, length);
+		this.mDataMap = csonObject.mDataMap;
+	}
+
+
 
 	protected Set<Entry<String, Object>> entrySet() {
 		return this.mDataMap.entrySet();
@@ -311,7 +317,7 @@ public class CSONObject extends CSONElement {
 		return stringBuilder.toString();
 	}
 
-	public byte[] toByteArray() {
+	public byte[] toBytes() {
 		CSONWriter writer = new CSONWriter();
 		write(writer);
 		return writer.toByteArray();

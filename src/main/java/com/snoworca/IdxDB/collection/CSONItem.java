@@ -4,13 +4,11 @@ import com.snoworca.IdxDB.exception.MissingIndexValueException;
 import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 class CSONItem implements Comparable<CSONItem> {
 
     private final static Pattern NUM_PATTERN = Pattern.compile("[+-]?([0-9]*[.])?[0-9]+");
-
 
 
     CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String IndexKey, int sort, boolean memCacheIndex) {
@@ -25,24 +23,14 @@ class CSONItem implements Comparable<CSONItem> {
         }
     }
 
-    CSONItem(StoreDelegator storeDelegator, String key,Object indexValue, int sort, boolean memCacheIndex) {
-        this.storeDelegator = storeDelegator;
-        this.indexKey = key;
-        this.sort = sort;
-        if(this.csonObject == null && storeDelegator != null) {
-            isStorageSaved = true;
-        }
-        this.indexValue = indexValue;
-        this.isMemCacheIndex = memCacheIndex;
-    }
-
 
     private volatile CSONObject csonObject;
     private String indexKey = null;
     private Object indexValue;
     private int sort = 0;
     private boolean isStorageSaved = false;
-    private long storagePos = -1;
+    private long dataPos = -1;
+    private int storeCapacity = -1;
     private StoreDelegator storeDelegator;
     private boolean isChanged = false;
 
@@ -54,42 +42,64 @@ class CSONItem implements Comparable<CSONItem> {
 
     public CSONObject getCsonObject() {
         if(csonObject == null) {
-            byte[] buffer = storeDelegator.load(storagePos);
-            CSONObject loadJSON = new CSONObject(buffer);
-            if(!isStorageSaved) csonObject = loadJSON;
-            else return loadJSON;
+            StoredInfo info = storeDelegator.loadData(dataPos);
+            csonObject = info.getCsonObject();
+            storeCapacity = info.getCapacity();
+            dataPos = info.getPosition();
+            return csonObject;
         }
         return csonObject;
     }
+
+    public void setStoreCapacity(int storeCapacity) {
+        this.storeCapacity = storeCapacity;
+    }
+
+    public int getStoreCapacity() {
+        return storeCapacity;
+    }
+
+
 
     public void setCsonObject(CSONObject jsonObject) {
         this.csonObject = jsonObject;
         this.isChanged = true;
     }
 
-    public long getStoragePos() {
+    /*public long getStoragePos() {
         return storagePos;
-    }
+    }*/
 
     public void storeIfNeed() {
-        if(storagePos > -1) return;
-        storagePos = storeDelegator.cache(csonObject.toByteArray());
-        isStorageSaved = true;
+        if(dataPos > -1) return;
+        store();
     }
 
     public void release() {
-        storagePos = -1;
+        dataPos = -1;
         csonObject = null;
         storeDelegator = null;
     }
 
 
+    private void store() {
+        if(csonObject == null) return;
+        Object indexVal = indexValue;
+        if(indexVal == null) {
+            indexVal = csonObject.get(indexKey);
+        }
+        StoredInfo info = storeDelegator.storeData(dataPos, csonObject);
+        dataPos = info.getPosition();
+        storeCapacity = info.getCapacity();
+        isStorageSaved = true;
+        isChanged = false;
+    }
+
 
     public void setStore(boolean enable) {
         if(enable) {
             if(this.csonObject != null && (!isStorageSaved || isChanged)) {
-                storagePos = storeDelegator.cache(csonObject.toByteArray());
-                isStorageSaved = true;
+                store();
             }
             if(!isMemCacheIndex) this.indexValue = null;
             this.csonObject = null;
@@ -102,12 +112,27 @@ class CSONItem implements Comparable<CSONItem> {
         }
     }
 
-    protected void setStoragePos(long pos) {
-        this.storagePos = pos;
+
+    public void replace(CSONObject jsonObject) {
+        setCsonObject(jsonObject);
+        store();
+    }
+
+
+
+    protected boolean isStored() {
+        return this.dataPos > -1;
+    }
+
+
+
+    protected void setStoragePos_(long pos) {
+        this.dataPos = pos;
         if(pos > -1 && storeDelegator != null) {
             isStorageSaved = true;
         }
     }
+
 
 
     @Override
@@ -154,6 +179,11 @@ class CSONItem implements Comparable<CSONItem> {
         return thisObj.toString().compareTo(targetIndexValue.toString()) * sort;
 
 
+    }
+
+
+    public long getStoragePos() {
+        return dataPos;
     }
 
     public Object getIndexValue() {

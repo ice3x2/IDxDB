@@ -22,7 +22,12 @@ public class CSONArray  extends CSONElement  implements Collection<Object> {
 	
 	public CSONArray(byte[] buffer) {
 		super(ElementType.Array);
-		 this.mList = ((CSONArray)CSONParser.parse(buffer)).mList;
+		this.mList = ((CSONArray)CSONParser.parse(buffer)).mList;
+	}
+
+	public CSONArray(byte[] buffer,int offset, int len) {
+		super(ElementType.Array);
+		this.mList = ((CSONArray)CSONParser.parse(buffer, offset, len)).mList;
 	}
 	
 	@Override

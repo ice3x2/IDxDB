@@ -1,26 +1,30 @@
 package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CollectionCreateCallback;
-import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataStore;
 
 import java.util.concurrent.locks.ReentrantLock;
 
 public class IndexMapBuilder {
 
     private IndexMapOption indexMapOption = null;
-    private DataIO dataIO;
 
     private ReentrantLock createLock;
     private CollectionCreateCallback callback;
 
-    public IndexMapBuilder(CollectionCreateCallback callback, DataIO dataIO, String name, ReentrantLock createLock) {
-        this.dataIO = dataIO;
+    private DataStore dataStore;
+
+    private int collectionID;
+
+    public IndexMapBuilder(CollectionCreateCallback callback,int id, DataStore dataStore, String name, ReentrantLock createLock) {
+        this.dataStore = dataStore;
         this.createLock = createLock;
         this.callback = callback;
         this.indexMapOption = new IndexMapOption(name);
+        this.collectionID = id;
     }
 
-    IndexMapBuilder(String name, DataIO dataIO) {
+    IndexMapBuilder(String name, DataStore dataStore) {
         indexMapOption = new IndexMapOption(name);
     }
 
@@ -40,6 +44,10 @@ public class IndexMapBuilder {
         return this;
     }
 
+    public IndexMapBuilder setCapacityRatio(float ratio) {
+        indexMapOption.setCapacityRatio(ratio);
+        return this;
+    }
 
     public IndexMapBuilder memCacheSize(int limit) {
         indexMapOption.setMemCacheSize(limit);
@@ -47,7 +55,7 @@ public class IndexMapBuilder {
     }
 
     public IndexLinkedMap create() {
-        IndexLinkedMap indexLinkedMap = new IndexLinkedMap(dataIO, indexMapOption);
+        IndexLinkedMap indexLinkedMap = new IndexLinkedMap(collectionID, dataStore, indexMapOption);
         createLock.lock();
         this.callback.onCreate(indexLinkedMap);
         createLock.unlock();

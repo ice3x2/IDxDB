@@ -4,7 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -81,7 +81,7 @@ class CSONObjectTest {
 
         jsonObject = new JSONObject(jsonObject.toString());
 
-        CSONObject csonObject = new CSONObject(new CSONObject(jsonObject.toString()).toByteArray());
+        CSONObject csonObject = new CSONObject(new CSONObject(jsonObject.toString()).toBytes());
         Set<String> originalKeySet = jsonObject.keySet();
         Set<String> csonKeySet =csonObject.keySet();
         assertEquals(originalKeySet, csonKeySet);
@@ -112,6 +112,28 @@ class CSONObjectTest {
             assertEquals(jao.getFloat("float"), cao.getFloat("float"));
             assertEquals(jao.getInt("float"), cao.getInteger("float"));
         }
+    }
+
+    @Test
+    public void overBufferTest() {
+        CSONObject csonObject = new CSONObject().put("sdfasdf",213123).put("sdf2w123", 21311).put("key", "name");
+        byte[] buffer = csonObject.toBytes();
+        ArrayList<Byte> list = new ArrayList<>();
+        for(byte b : buffer) {
+            list.add(b);
+        }
+        Random rand = new Random(System.currentTimeMillis());
+        for(int i = 0; i < 1000; ++i) {
+            list.add((byte)rand.nextInt(255));
+        }
+        byte[] overBuffer = new byte[list.size()];
+        for(int i = 0, n = list.size(); i < n; ++i) {
+            overBuffer[i] = list.get(i);
+        }
+        CSONObject fromOverBuffer = new CSONObject(overBuffer);
+        assertArrayEquals(csonObject.toBytes(), fromOverBuffer.toBytes());
+
+
     }
 
 

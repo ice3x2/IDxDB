@@ -37,7 +37,10 @@ public class CommitResult {
 
     public CSONObject toCsonObject() {
         return new CSONObject().put("add", add).put("replace", replace).put("remove", remove);
-
     }
 
+    @Override
+    public String toString() {
+        return toCsonObject().toString();
+    }
 }

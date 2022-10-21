@@ -1,29 +1,37 @@
 package com.snoworca.IdxDB;
 
-import com.snoworca.IdxDB.collection.*;
 
-import com.snoworca.IdxDB.dataStore.DataBlock;
-import com.snoworca.IdxDB.dataStore.DataIO;
-import com.snoworca.IdxDB.dataStore.DataIOConfig;
+
+import com.snoworca.IdxDB.collection.*;
+import com.snoworca.IdxDB.store.DataBlock;
+import com.snoworca.IdxDB.store.DataStore;
+import com.snoworca.IdxDB.store.DataStoreOptions;
 import com.snoworca.cson.CSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class IdxDB {
 
-    private DataIO dataIO;
-    private long topStoreInfoStorePos = 0;
-    private long createTime = 0;
+    private static final int DB_INFO_ID = 0;
+    private static final int START_ID = 10000;
+
+    private AtomicInteger lastCollectionID = new AtomicInteger(START_ID);
+
+    private DataStore dataStore;
 
     private final static String META_INFO_TYPE_ENTRY = "entry";
 
 
     private ConcurrentHashMap<String, IndexCollection> indexCollectionMap = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<String, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, IndexCollection> indexCollectionIDMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
     private ReentrantLock collectionMutableLock = new ReentrantLock();
 
 
@@ -36,6 +44,8 @@ public class IdxDB {
         private int dataReaderCapacity = 3;
         private final static long version = 1;
 
+        private CompressionType compressionType = CompressionType.NONE;
+
         public IdxDBMaker(File file) {
             this.dbFile = file;
         }
@@ -46,14 +56,19 @@ public class IdxDB {
             return this;
         }
 
+        public IdxDBMaker compressionType(CompressionType compressionType) {
+            this.compressionType = compressionType;
+            return this;
+        }
 
         public IdxDB make() throws IOException {
             IdxDB idxDB = new IdxDB();
-            DataIOConfig dataIOConfig = new DataIOConfig();
-            dataIOConfig.setReaderCapacity(dataReaderCapacity);
+            DataStoreOptions dataStoreOption = new DataStoreOptions();
+            dataStoreOption.setReaderSize(dataReaderCapacity);
+            dataStoreOption.setCompressionType(compressionType);
             boolean existDBFile = dbFile.isFile() && dbFile.length() > 0;
-            idxDB.dataIO = new DataIO(dbFile, dataIOConfig);
-            idxDB.dataIO.open();
+            idxDB.dataStore = new DataStore(dbFile, dataStoreOption);
+            idxDB.dataStore.open();
             if(existDBFile) {
                 loadDB(idxDB);
             } else {
@@ -63,58 +78,68 @@ public class IdxDB {
         }
 
         private void loadDB(IdxDB db) throws IOException {
-            DataBlock dataBlock = db.dataIO.get(0);
-            CSONObject csonObject = new CSONObject(dataBlock.getData());
-            db.createTime = csonObject.getLong("create");
-            //TODO type 확인하고 일치하지 않을경우 exception
-            long nextPos = dataBlock.getHeader().getNext();
-            loadCollections(db, nextPos);
-        }
-
-        private void loadCollections(IdxDB db, long collectionInfoPos) {
-            if(collectionInfoPos < 0) return;
-            Iterator<DataBlock> dataBlockIterator = db.dataIO.iterator(collectionInfoPos);
-            while(dataBlockIterator.hasNext()) {
-                DataBlock dataBlock = dataBlockIterator.next();
-                byte[] buffer = dataBlock.getData();
-                CSONObject csonObject = new CSONObject(buffer);
-                String name = csonObject.getString("name");
-                db.indexCollectionInfoStorePosMap.put(name, dataBlock.getPos());
-                if(IndexTreeSet.class.getName().equals(csonObject.getString("className"))) {
-                    IndexTreeSet indexTreeSet = new IndexTreeSet(db.dataIO, IndexSetOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
-                } else if(IndexLinkedMap.class.getName().equals(csonObject.getString("className"))) {
-                    IndexLinkedMap indexLinkedMap = new IndexLinkedMap(db.dataIO, IndexMapOption.fromCSONObject(csonObject));
-                    db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
+             for(DataBlock dataBlock : db.dataStore) {
+                 int id = dataBlock.getCollectionId();
+                 if(id == DB_INFO_ID) {
+                     continue;
+                 } else if(id < START_ID){
+                     continue;
+                 }
+                 IndexCollection indexCollection = db.indexCollectionIDMap.get(id);
+                if(indexCollection == null) {
+                    CSONObject collectionOption = new CSONObject(dataBlock.getData());
+                    indexCollection = restoreIndexCollection(db, id, collectionOption);
+                    db.indexCollectionInfoStorePosMap.put(id, dataBlock.getPosition());
+                    continue;
                 }
-            }
+                ((Restorable) indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
 
+             }
+             Collection<IndexCollection> indexCollections =  db.indexCollectionMap.values();
+             for(IndexCollection indexCollection : indexCollections) {
+                 ((Restorable)indexCollection).end();
+             }
         }
 
+        private IndexCollection restoreIndexCollection(IdxDB db,int id, CSONObject collectionOption) {
+
+            String className = collectionOption.optString("className");
+            IndexCollection indexCollection = null;
+            if(IndexTreeSet.class.getName().equals(className)) {
+                IndexTreeSet indexTreeSet = new IndexTreeSet(id, db.dataStore, IndexSetOption.fromCSONObject(collectionOption));
+                db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
+                indexCollection = indexTreeSet;
+            } else if(IndexLinkedMap.class.getName().equals(className)) {
+                IndexLinkedMap indexLinkedMap = new IndexLinkedMap(id, db.dataStore, IndexMapOption.fromCSONObject(collectionOption));
+                db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
+                indexCollection = indexLinkedMap;
+            }
+            if(indexCollection != null) {
+                db.indexCollectionIDMap.put(id, indexCollection);
+                db.indexCollectionMap.put(indexCollection.getName(), indexCollection);
+            }
+            return indexCollection;
+        }
 
 
         private void initDB(IdxDB db) throws IOException {
             CSONObject dbInfo = new CSONObject().put("type", META_INFO_TYPE_ENTRY).put("name", "idxDB").put("version", version).put("create", System.currentTimeMillis());
-            DataBlock dataBlock = db.dataIO.write(dbInfo.toByteArray());
-            db.topStoreInfoStorePos = dataBlock.getPos();
+            db.dataStore.write(DB_INFO_ID,dbInfo.toBytes());
         }
 
     }
 
 
     public boolean dropCollection(String collectionName) {
-
-        Long pos = indexCollectionInfoStorePosMap.remove(collectionName);
-        if(pos == null) {
+        IndexCollection indexCollection = indexCollectionMap.remove(collectionName);
+        if(indexCollection == null) {
             return false;
         }
+        Long pos = indexCollectionInfoStorePosMap.remove(indexCollection.getID());
         try {
-            dataIO.unlink(pos);
-            IndexCollection indexCollection = indexCollectionMap.remove(collectionName);
-            if(indexCollection != null) {
-                indexCollection.clear();
-                indexCollection.commit();
-            }
+            indexCollection.clear();
+            indexCollection.commit();
+            dataStore.unlink(pos);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -128,13 +153,13 @@ public class IdxDB {
 
 
     public boolean isClosed() {
-        return dataIO == null;
+        return dataStore == null;
     }
 
 
     public void close() {
-        dataIO.close();
-        dataIO = null;
+        dataStore.close();
+        dataStore = null;
     }
 
 
@@ -145,19 +170,14 @@ public class IdxDB {
             public void onCreate(IndexCollection indexCollection) {
                 String name = indexCollection.getName();
                 indexCollectionMap.put(name, indexCollection);
+                indexCollectionIDMap.put(indexCollection.getID(), indexCollection);
                 long headPos = indexCollection.getHeadPos();
                 CSONObject optionInfo = ((IndexCollectionBase)indexCollection).getOptionInfo();
                 optionInfo.put("headPos", headPos);
-                byte[] buffer = optionInfo.toByteArray();
+                byte[] buffer = optionInfo.toBytes();
                 try {
-                    DataBlock dataBlock = dataIO.write(buffer);
-                    long pos = dataBlock.getPos();
-                    long lastPos = topStoreInfoStorePos;
-                    dataIO.setNextPos(lastPos, pos);
-                    dataIO.setPrevPos(pos, lastPos);
-                    dataIO.setPrevPos(0, -1);
-                    indexCollectionInfoStorePosMap.put(name, pos);
-                    topStoreInfoStorePos = pos;
+                    DataBlock dataBlock =dataStore.write(indexCollection.getID(), buffer);
+                    indexCollectionInfoStorePosMap.put(indexCollection.getID(),dataBlock.getPosition());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -166,15 +186,13 @@ public class IdxDB {
     };
 
     public IndexMapBuilder newIndexMapBuilder(String name) {
-        return new IndexMapBuilder(makeCollectionCreateCallback(name), dataIO,name, collectionMutableLock);
+        return new IndexMapBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,name, collectionMutableLock);
     }
 
 
 
-    public IndexSetBuilder  newIndexTreeSetBuilder(String name) {
-
-
-        return new IndexSetBuilder(makeCollectionCreateCallback(name), dataIO,name, collectionMutableLock);
+    public IndexSetBuilder newIndexTreeSetBuilder(String name) {
+        return new IndexSetBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,name, collectionMutableLock);
     }
 
 

@@ -10,10 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,6 +66,7 @@ class IdxDBTest {
     @Test
     public void fileStoreTest() throws IOException {
         File file = new File("fileStoreTest.dat");
+        file.delete();
         long start = System.currentTimeMillis();
         IdxDB idxDB = IdxDB.newMaker(file).make();
         int collectionSize = 20;
@@ -296,7 +294,7 @@ class IdxDBTest {
         System.out.print("addOrReplaceAllQuery: ");
         System.out.println(resultQuery);
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",30).put("where",new CSONObject().put("dateL",50).put("$op", "gte")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",30).put("where",new CSONObject().put("dateL",50).put("$op", "gte")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find gte(50), limit(30): ");
         System.out.println(resultQuery);
@@ -306,7 +304,7 @@ class IdxDBTest {
         assertEquals(resultData.getObject(29).getInt("dateL"), 79);
 
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",5).put("where",new CSONObject().put("dateL",50).put("$op", "gt")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",5).put("where",new CSONObject().put("dateL",50).put("$op", "gt")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find gt(50), limit(5): ");
         System.out.println(resultQuery);
@@ -316,7 +314,7 @@ class IdxDBTest {
         assertEquals(resultData.getObject(4).getInt("dateL"), 55);
 
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",7).put("where",new CSONObject().put("dateL",10).put("$op", "lte")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",7).put("where",new CSONObject().put("dateL",10).put("$op", "lte")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find lte(10), limit(7): ");
         System.out.println(resultQuery);
@@ -326,7 +324,7 @@ class IdxDBTest {
         assertEquals(resultData.getObject(6).getInt("dateL"), 4);
 
 
-        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("memCacheSize",100000).put("where",new CSONObject().put("dateL",30).put("$op", "lt")));
+        findQuery = new CSONObject().put("method", "findByIndex").put("argument", new CSONObject().put("name","201120").put("limit",100000).put("where",new CSONObject().put("dateL",30).put("$op", "lt")));
         resultQuery = idxDB.executeCSONQuery(findQuery);
         System.out.print("find lt(30), limit(100000): ");
         System.out.println(resultQuery);
@@ -399,7 +397,132 @@ class IdxDBTest {
 
         file.delete();
 
+    }
+
+    @Test
+    public void replaceDataSetTest() throws IOException {
+        File file = new File("test.db");
+        file.delete();
+        IdxDB db = IdxDB.newMaker(file).make();
+        IndexTreeSet indexTreeSet = db.newIndexTreeSetBuilder("testDB").index("key", 1).setCapacityRatio(0.5f).create();
+        indexTreeSet.add(new CSONObject().put("key", "1234567890").put("value", "BBBBBBBBBB"));
+        indexTreeSet.commit();
+        long fileSize = file.length();
+        indexTreeSet.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "AAAAAAAAAAAAAA"));
+        System.out.println(indexTreeSet.commit().toString());
+        assertEquals(fileSize, file.length());
+
+        assertEquals("AAAAAAAAAAAAAA", indexTreeSet.findOneByIndex("1234567890").get("value"));
+
+
+        indexTreeSet.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc"));
+        indexTreeSet.commit();
+
+        assertNotEquals(fileSize, file.length());
+
+        assertEquals("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc", indexTreeSet.findOneByIndex("1234567890").get("value"));
 
     }
+
+
+    @Test
+    public void replaceDataMapTest() throws IOException {
+        File file = new File("test.db");
+        file.delete();
+        IdxDB db = IdxDB.newMaker(file).make();
+        IndexLinkedMap indexLinkedMap = db.newIndexMapBuilder("testDB").index("key", 1).setCapacityRatio(0.5f).create();
+        indexLinkedMap.add(new CSONObject().put("key", "1234567890").put("value", "BBBBBBBBBB"));
+        indexLinkedMap.commit();
+        long fileSize = file.length();
+        indexLinkedMap.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "AAAAAAAAAAAAAA"));
+        System.out.println(indexLinkedMap.commit().toString());
+        assertEquals(fileSize, file.length());
+
+        assertEquals("AAAAAAAAAAAAAA", indexLinkedMap.findOneByIndex("1234567890").get("value"));
+
+
+        indexLinkedMap.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc"));
+        indexLinkedMap.commit();
+
+        assertNotEquals(fileSize, file.length());
+
+        assertEquals("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc", indexLinkedMap.findOneByIndex("1234567890").get("value"));
+        file.delete();
+
+    }
+
+    /*
+    @Test
+    public void compressionTest() throws IOException {
+        Random rand = new Random(System.currentTimeMillis());
+
+        File file = new File("test.db");
+        file.delete();
+        IdxDB noneDB = IdxDB.newMaker(file).compressionType(CompressionType.NONE).make();
+        IndexTreeSet indexTreeSetNone = noneDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetNone.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        long start = System.currentTimeMillis();
+        indexTreeSetNone.commit();
+        System.out.println("압축하지 않음: " + (file.length() / 1024 / 1024) + "Mb   " + (System.currentTimeMillis() - start) + "ms" );
+        noneDB.close();
+        file.delete();
+
+
+        IdxDB gzipDB = IdxDB.newMaker(file).compressionType(CompressionType.GZIP).make();
+        IndexTreeSet indexTreeSetGZIP = gzipDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetGZIP.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        start = System.currentTimeMillis();
+        indexTreeSetGZIP.commit();
+        System.out.println("Gzip 압축: " + (file.length() / 1024 / 1024) + "Mb  " + (System.currentTimeMillis() - start) + "ms" );
+        gzipDB.close();
+        file.delete();
+
+
+        IdxDB deflateDB = IdxDB.newMaker(file).compressionType(CompressionType.Deflater).make();
+        IndexTreeSet indexTreeSetDeflate = deflateDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetDeflate.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        start = System.currentTimeMillis();
+        indexTreeSetDeflate.commit();
+        System.out.println("Deflate 압축: " + (file.length() / 1024 / 1024) + "Mb  " + (System.currentTimeMillis() - start) + "ms" );
+        deflateDB.close();
+        file.delete();
+
+        IdxDB snappyDB = IdxDB.newMaker(file).compressionType(CompressionType.SNAPPY).make();
+        IndexTreeSet indexTreeSetSnappy = snappyDB.newIndexTreeSetBuilder("testDB").index("key", 1).create();
+        for(long i = 0; i < 100000L; ++i) {
+            CSONObject data = new CSONObject().put("key", i);
+            indexTreeSetSnappy.add(data);
+            for(int c = 'a'; c <= 'z'; ++c) {
+                data.put(String.valueOf((char)c), rand.nextLong());
+            }
+        }
+        start = System.currentTimeMillis();
+        indexTreeSetSnappy.commit();
+        System.out.println("Snappy 압축: " + (file.length() / 1024 / 1024) + "Mb  " + (System.currentTimeMillis() - start) + "ms" );
+        snappyDB.close();
+
+        snappyDB = IdxDB.newMaker(file).compressionType(CompressionType.SNAPPY).make();
+        file.delete();
+    }*/
+
+
 
 }

@@ -2,7 +2,7 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.dataStore.DataIO;
+import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.cson.CSONObject;
 
 import java.io.IOException;
@@ -20,8 +20,8 @@ public class IndexTreeSet extends IndexCollectionBase {
     private boolean isMemCacheIndex;
 
 
-    public IndexTreeSet(DataIO dataIO, IndexSetOption option) {
-        super(dataIO, option);
+    public IndexTreeSet(int id, DataStore dataStore, IndexSetOption option) {
+        super(id, dataStore, option);
         this.indexKey = super.getIndexKey();
         this.storeDelegator = super.getStoreDelegator();
         this.indexSort = super.getSort();
@@ -48,7 +48,7 @@ public class IndexTreeSet extends IndexCollectionBase {
         int count = 0;
         int memCacheLimit = getMemCacheSize();
         for (CSONItem csonItem : itemSet) {
-            if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
+            /*if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
                 try {
                     unlink(csonItem);
                 } catch (IOException e) {
@@ -57,6 +57,7 @@ public class IndexTreeSet extends IndexCollectionBase {
                 csonItem.setStoragePos(-1);
             }
             csonItem.storeIfNeed();
+            */
             boolean isMemCache = count > memCacheLimit;
             csonItem.setStore(isMemCache);
             if(isMemCache) {
@@ -126,7 +127,7 @@ public class IndexTreeSet extends IndexCollectionBase {
                         indexChanged = true;
                     break;
                     case TransactionOrder.ORDER_REMOVE:
-                        if(item.getStoragePos() < 0) {
+                        if(!item.isStored()) {
                             CSONItem realItem = get_(item.getCsonObject());
                             if(realItem != null) item = realItem;
                         }
@@ -156,16 +157,13 @@ public class IndexTreeSet extends IndexCollectionBase {
                             item.storeIfNeed();
                             commitResult.incrementCountOfAdd();
                         } else {
-                            if(foundItemOfAddOrReplace.getStoragePos() < 0) {
+                            if(!foundItemOfAddOrReplace.isStored()) {
                                 CSONItem foundItemOfAddOrReplaceReal = get_(foundItemOfAddOrReplace.getCsonObject());
                                 if(foundItemOfAddOrReplaceReal != null) {
                                     foundItemOfAddOrReplace = foundItemOfAddOrReplaceReal;
                                 }
                             }
-                            unlink(foundItemOfAddOrReplace);
-                            foundItemOfAddOrReplace.setStoragePos(-1);
-                            foundItemOfAddOrReplace.setCsonObject(addOrReplaceCsonObject);
-                            foundItemOfAddOrReplace.storeIfNeed();
+                            foundItemOfAddOrReplace.replace(addOrReplaceCsonObject);
                             commitResult.incrementCountOfReplace();
                         }
                     break;
@@ -173,16 +171,13 @@ public class IndexTreeSet extends IndexCollectionBase {
                         CSONObject replaceCsonObject = item.getCsonObject();
                         CSONItem foundItemOfReplace = get_(replaceCsonObject);
                         if(foundItemOfReplace != null) {
-                            if(foundItemOfReplace.getStoragePos() < 0) {
+                            if(!foundItemOfReplace.isStored()) {
                                 CSONItem foundItemOfReplaceReal = get_(foundItemOfReplace.getCsonObject());
                                 if(foundItemOfReplaceReal != null) {
                                     foundItemOfReplace = foundItemOfReplaceReal;
                                 }
                             }
-                            unlink(foundItemOfReplace);
-                            foundItemOfReplace.setStoragePos(-1);
-                            foundItemOfReplace.setCsonObject(replaceCsonObject);
-                            foundItemOfReplace.storeIfNeed();
+                            foundItemOfReplace.replace(replaceCsonObject);
                             commitResult.incrementCountOfReplace();
                         }
                     break;
@@ -242,11 +237,11 @@ public class IndexTreeSet extends IndexCollectionBase {
             case gt:
                 if(indexSort > 0) {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.tailSet(makeIndexItem(indexValue),op == OP.gte), limit );
                     readUnlock();;
                 } else {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.gte), limit);
                     readUnlock();
                 }
                 break;
@@ -254,11 +249,11 @@ public class IndexTreeSet extends IndexCollectionBase {
             case lt:
                 if(indexSort > 0) {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.descendingSet().tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
                     readUnlock();
                 } else {
                     readLock();
-                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
+                    result = (ArrayList<CSONObject>)jsonItemCollectionsToJsonObjectCollection(0,itemSet.tailSet(makeIndexItem(indexValue), op == OP.lte), limit);
                     readUnlock();
                 }
                 break;
@@ -304,24 +299,33 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     @Override
     public List<CSONObject> list(int limit, boolean reverse) {
+        return list(0, limit, reverse);
+    }
+
+    @Override
+    public List<CSONObject> list(int start, int limit, boolean reverse) {
         try {
             readLock();
             if (reverse) {
-                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet.descendingSet(), limit);
+                List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,itemSet.descendingSet(), limit);
                 return result;
             }
-            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(itemSet, limit);
+            List<CSONObject> result = (List<CSONObject>) jsonItemCollectionsToJsonObjectCollection(start,itemSet, limit);
             return result;
         } finally {
             readUnlock();
         }
-
     }
 
-    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(Collection<CSONItem> CSONItems, int limit) {
+    private Collection<CSONObject> jsonItemCollectionsToJsonObjectCollection(int start, Collection<CSONItem> CSONItems, int limit) {
         int count = 0;
+        int continueIdx = 0;
         ArrayList<CSONObject> csonObjects = new ArrayList<>();
         for(CSONItem item : CSONItems) {
+            if(continueIdx < start) {
+                continueIdx++;
+                continue;
+            }
             if(count >= limit) {
                 break;
             }
@@ -380,6 +384,12 @@ public class IndexTreeSet extends IndexCollectionBase {
             }
         }
         return list;
+    }
+
+    @Override
+    public long findIndexPos(Object indexValue) {
+        CSONItem foundItem = get_(new CSONObject().put(indexKey, indexValue));
+        return foundItem != null ? foundItem.getStoragePos() : -1;
     }
 
 
@@ -443,5 +453,19 @@ public class IndexTreeSet extends IndexCollectionBase {
 
             }
         };
+    }
+
+    @Override
+    public void restore(StoredInfo info) {
+        CSONObject csonObject = info.getCsonObject();
+        CSONItem csonItem = new CSONItem(storeDelegator, csonObject,indexKey, indexSort, isMemCacheIndex);
+        csonItem.setStoreCapacity(info.getCapacity());
+        csonItem.setStoragePos_(info.getPosition());
+        itemSet.add(csonItem);
+    }
+
+    @Override
+    public void end() {
+        onMemStore();
     }
 }

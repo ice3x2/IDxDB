@@ -12,6 +12,8 @@ public abstract class IndexValue {
         return new IndexValueItem(csonItem);
     }
 
+
+
     @Override
     public boolean equals(Object obj) {
         if(obj == null) return false;

@@ -32,6 +32,8 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     public List<CSONObject> list(int limit,boolean reverse);
 
+    public List<CSONObject> list(int start, int limit,boolean reverse);
+
     public int size();
 
     public CommitResult commit();
@@ -46,5 +48,8 @@ public interface IndexCollection extends Iterable<CSONObject> {
 
     public void clear();
 
+    long findIndexPos(Object indexValue);
+
+    public int getID();
 
 }
