@@ -23,6 +23,17 @@ class CSONItem implements Comparable<CSONItem> {
         }
     }
 
+    CSONItem(StoreDelegator storeDelegator, String indexValue, String IndexKey, int sort, boolean memCacheIndex) {
+        this.storeDelegator = storeDelegator;
+        this.indexKey = IndexKey;
+        this.sort = sort;
+        this.indexValue = indexValue;
+        this.isMemCacheIndex = memCacheIndex;
+        if(this.indexValue == null) {
+            throw new MissingIndexValueException(indexKey, new CSONObject());
+        }
+    }
+
 
     private volatile CSONObject csonObject;
     private String indexKey = null;

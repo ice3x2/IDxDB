@@ -458,7 +458,8 @@ public class IndexTreeSet extends IndexCollectionBase {
     @Override
     public void restore(StoredInfo info) {
         CSONObject csonObject = info.getCsonObject();
-        CSONItem csonItem = new CSONItem(storeDelegator, csonObject,indexKey, indexSort, isMemCacheIndex);
+        String indexKey = getIndexKey();
+        CSONItem csonItem = new CSONItem(getStoreDelegator(), csonObject.optString(indexKey),indexKey, getSort(), isMemCacheIndex);
         csonItem.setStoreCapacity(info.getCapacity());
         csonItem.setStoragePos_(info.getPosition());
         itemSet.add(csonItem);
