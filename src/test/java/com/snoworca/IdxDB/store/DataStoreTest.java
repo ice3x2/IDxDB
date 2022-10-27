@@ -126,10 +126,27 @@ class DataStoreTest {
     }
 
     @Test
+    void simpleWriteTest() throws IOException {
+        File file = new File("test.dat");
+        file.delete();
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(CompressionType.Deflater));
+        dataStore.open();
+        String str = getRandomString(100) + "\0";
+        System.out.println(str);
+        long pos = dataStore.write(1, str.getBytes()).getPosition();
+        byte[] buffer = dataStore.get(pos).getData();
+        System.out.println(new String(buffer));
+
+
+
+
+    }
+
+    @Test
     void multiWriteTest() throws IOException {
         File file = new File("test.dat");
         file.delete();
-        DataStore dataStore = new DataStore(file);
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(CompressionType.Deflater));
         dataStore.open();
         ArrayList<DataBlock> dataBlocks = new ArrayList<>();
         ArrayList<CSONArray> datas = new ArrayList<>();
@@ -183,7 +200,7 @@ class DataStoreTest {
     void changeDataTest() throws IOException {
         File file = new File("test.dat");
         file.delete();
-        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(CompressionType.Deflater));
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(CompressionType.NONE));
         dataStore.open();
         Random random = new Random(System.currentTimeMillis());
         dataStore.write(1, getRandomString(random.nextInt(10000) + 1).getBytes());

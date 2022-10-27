@@ -161,15 +161,28 @@ public class DataWriter {
         return write(collectionID, buffer, false);
     }
 
-    private void initInputDataBlock(DataBlock dataBlock) {
-        byte[] buffer = compress(dataBlock.getData());
-        int capacity = (int) (buffer.length * (capacityRatio + 1.0f));
-        dataBlock.getHeader().setCapacity(capacity);
-        if(buffer.length < capacity) {
-            byte[] newBuffer = new byte[capacity];
-            System.arraycopy(buffer, 0, newBuffer, 0, buffer.length);
-            buffer = newBuffer;
+    private byte[] extendBufferToCapacity(byte[] buffer, int capacity) {
+        if(capacity == buffer.length) {
+            return buffer;
         }
+        byte[] newBuffer = new byte[capacity];
+        System.arraycopy(buffer, 0, newBuffer, 0, buffer.length);
+        return newBuffer;
+    }
+
+    private int calcCapacity(int len) {
+        int capacity = (int) (len * (1.0f + capacityRatio));
+        return capacity;
+    }
+
+    private void initInputDataBlock(DataBlock dataBlock) {
+        byte[] buffer = dataBlock.getData();
+        int capacity = calcCapacity(buffer.length);
+        buffer = extendBufferToCapacity(buffer, capacity);
+        buffer = compress(buffer);
+        capacity = buffer.length;
+        dataBlock.getHeader().setCapacity(capacity);
+
         dataBlock.setData(buffer);
         dataBlock.setCompressionType((byte)compressionType.getValue());
     }
@@ -208,10 +221,12 @@ public class DataWriter {
 
 
     private DataBlock write(int collectionID,byte[] buffer, boolean compressed) throws IOException {
+
+        buffer = extendBufferToCapacity(buffer, calcCapacity(buffer.length));
         if(!compressed) {
             buffer = compress(buffer);
         }
-        int capacity = (int)(buffer.length * (capacityRatio + 1.0f));
+        int capacity = buffer.length;
         lock.lock();
         isLock = true;
         EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo;
@@ -232,11 +247,6 @@ public class DataWriter {
         }
 
         DataBlock dataBlock = new DataBlock(new DataBlockHeader(collectionID,capacity, (byte)compressionType.getValue()));
-        if(capacity > buffer.length) {
-            byte[] newBuffer = new byte[capacity];
-            System.arraycopy(buffer,0,newBuffer,0,buffer.length);
-            buffer = newBuffer;
-        }
         dataBlock.setData(buffer);
         write(dataBlock);
         return dataBlock;

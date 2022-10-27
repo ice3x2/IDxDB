@@ -52,6 +52,7 @@ public class CompressionUtil {
         try {
             deflaterOutputStream = new DeflaterOutputStream(baos);
             deflaterOutputStream.write(data);
+            deflaterOutputStream.flush();
             deflaterOutputStream.finish();
             deflaterOutputStream.close();
         } catch (IOException e) {
