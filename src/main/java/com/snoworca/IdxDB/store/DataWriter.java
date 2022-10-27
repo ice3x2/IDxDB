@@ -6,20 +6,16 @@ import com.snoworca.IdxDB.util.RefByteArrayOutputStream;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.PriorityQueue;
-import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class DataWriter {
 
-    private final int DEFAULT_BUFFER_LEN = 512 * 1024;
+    private final static int DEFAULT_BUFFER_LEN = 512 * 1024;
 
     private final File dataFile;
     private RandomAccessFile randomAccessFile;
@@ -134,8 +130,9 @@ public class DataWriter {
             isLock = false;
             lock.unlock();
         }
-
     }
+
+
 
     DataBlock changeData(DataBlock dataBlock, byte[] buffer) throws IOException {
         long pos = dataBlock.getPosition();

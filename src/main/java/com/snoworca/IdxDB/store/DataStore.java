@@ -5,6 +5,7 @@ import com.snoworca.IdxDB.exception.AccessOutOfRangePositionDataException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -118,8 +119,6 @@ public class DataStore implements Iterable<DataBlock> {
         return get(pos).getData();
     }
 
-
-
     public DataBlock replaceOrWrite(int collectionID, byte[] buffer, long pos) throws IOException {
         if(pos < 0) {
             return write(collectionID, buffer);
@@ -129,6 +128,25 @@ public class DataStore implements Iterable<DataBlock> {
             return write(collectionID, buffer);
         }
         return dataWriter.changeData(dataBlock, buffer);
+    }
+
+    public void replaceOrWrite(DataBlock[] dataBlocks) throws IOException {
+        ArrayList<DataBlock> writeBlockList = new ArrayList<>();
+        for(int i = 0, n = dataBlocks.length; i < n; ++i) {
+            DataBlock dataBlock = dataBlocks[i];
+            long pos = dataBlock.getPosition();
+            if(pos < 0) {
+                writeBlockList.add(dataBlock);
+            }
+            DataBlock readBlock = get(pos);
+            if(readBlock == null) {
+                writeBlockList.add(dataBlock);
+            }
+            dataWriter.changeData(readBlock, dataBlock.getData());
+        }
+
+
+        //return
     }
 
     public DataBlock write(int collectionID, byte[] buffer) throws IOException {

@@ -1,5 +1,6 @@
 package com.snoworca.IdxDB.store;
 
+import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.cson.CSONArray;
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +9,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -180,8 +183,7 @@ class DataStoreTest {
     void changeDataTest() throws IOException {
         File file = new File("test.dat");
         file.delete();
-        DataStoreOptions options = new DataStoreOptions();
-        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f));
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(CompressionType.Deflater));
         dataStore.open();
         Random random = new Random(System.currentTimeMillis());
         dataStore.write(1, getRandomString(random.nextInt(10000) + 1).getBytes());
@@ -201,8 +203,35 @@ class DataStoreTest {
         for(int i = 0, n = 13000; i < n; ++i) {
             assertEquals(buffer[i], readData[i]);
         }
+
         dataStore.close();
+        System.out.println(file.length());
         file.delete();
+    }
+
+    @Test
+    public void syncTest() {
+
+        ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+        Object monitor = new Object();
+        long start = System.currentTimeMillis();
+        long k = 0;
+        ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
+        for(int i = 0; i < 10000000; ++i) {
+            readLock.lock();
+            ++k;
+            readLock.unlock();
+        }
+        System.out.println(System.currentTimeMillis() - start);
+        start = System.currentTimeMillis();
+        k = 0;
+        for(int i = 0; i < 10000000; ++i) {
+
+                ++k;
+
+        }
+
+        System.out.println(System.currentTimeMillis() - start);
     }
 
 }
