@@ -1,6 +1,9 @@
 package com.snoworca.IdxDB.store;
 
+import com.snoworca.IdxDB.CompressionType;
+
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class DataBlock {
 
@@ -11,6 +14,16 @@ public class DataBlock {
     private DataBlock() {
 
     }
+
+    public static DataBlock createWriteDataBlock(int collectionID,byte[] data) {
+        DataBlock dataBlock = new DataBlock();
+        dataBlock.header = new DataBlockHeader(collectionID,data.length, (byte) 0);
+        dataBlock.data = data;
+        dataBlock.position = -1;
+        return dataBlock;
+    }
+
+
 
     protected DataBlock(DataBlockHeader header) {
         this.header = header;

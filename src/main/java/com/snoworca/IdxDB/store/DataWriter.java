@@ -2,16 +2,24 @@ package com.snoworca.IdxDB.store;
 
 import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.util.CompressionUtil;
+import com.snoworca.IdxDB.util.RefByteArrayOutputStream;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.PriorityQueue;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class DataWriter {
+
+    private final int DEFAULT_BUFFER_LEN = 512 * 1024;
 
     private final File dataFile;
     private RandomAccessFile randomAccessFile;
@@ -104,9 +112,9 @@ public class DataWriter {
         lock.unlock();
     }
 
-    private void replaceSpot(long pos, byte[] buffer) throws IOException {
+    private void replaceSpot(long pos, byte[] buffer, int offset, int len) throws IOException {
         randomAccessFile.seek(pos);
-        writeChannel.write(ByteBuffer.wrap(buffer));
+        writeChannel.write(ByteBuffer.wrap(buffer,offset,len));
     }
 
     void unlink(long pos, int capacity) throws IOException {
@@ -139,7 +147,7 @@ public class DataWriter {
             lock.lock();
             isLock = true;
             try {
-                replaceSpot(pos + DataBlockHeader.HEADER_SIZE, buffer);
+                replaceSpot(pos + DataBlockHeader.HEADER_SIZE, buffer, 0, buffer.length);
                 dataBlock.setData(buffer);
                 return dataBlock;
             } finally {
@@ -155,6 +163,52 @@ public class DataWriter {
     DataBlock write(int collectionID,byte[] buffer) throws IOException {
         return write(collectionID, buffer, false);
     }
+
+    private void initInputDataBlock(DataBlock dataBlock) {
+        byte[] buffer = compress(dataBlock.getData());
+        int capacity = (int) (buffer.length * (capacityRatio + 1.0f));
+        dataBlock.getHeader().setCapacity(capacity);
+        if(buffer.length < capacity) {
+            byte[] newBuffer = new byte[capacity];
+            System.arraycopy(buffer, 0, newBuffer, 0, buffer.length);
+            buffer = newBuffer;
+        }
+        dataBlock.setData(buffer);
+        dataBlock.setCompressionType((byte)compressionType.getValue());
+    }
+
+
+    void write(DataBlock[] dataBlocks) throws IOException {
+        int size = 0;
+        ArrayList<DataBlock> listOfDataBlockToNewArea = new ArrayList<>();
+        RefByteArrayOutputStream byteArrayOutputStream = new RefByteArrayOutputStream(DEFAULT_BUFFER_LEN);
+        for(int i = 0; i < dataBlocks.length; ++i) {
+            DataBlock dataBlock = dataBlocks[i];
+            initInputDataBlock(dataBlock);
+            EmptyBlockPositionPool.EmptyBlockInfo emptyInfo = emptyBlockPositionPool.obtain(dataBlock.getCapacity());
+            size += dataBlock.getCapacity();
+            if(emptyInfo != null) {
+                dataBlock.setCapacity(emptyInfo.getCapacity());
+                dataBlock.setPosition(emptyInfo.getPosition());
+                replace(dataBlock.getPosition(), dataBlock.getHeader(), dataBlock.getData());
+            }
+            else {
+                listOfDataBlockToNewArea.add(dataBlock);
+                byteArrayOutputStream.write(dataBlock.toBytes(), 0, dataBlock.getCapacity());
+            }
+        }
+        size = byteArrayOutputStream.size();
+        lock.lock();
+        long pos = this.dataLength.getAndAdd(size);
+        replaceSpot(pos, byteArrayOutputStream.getBuffer(),0, size);
+        lock.unlock();
+        for(int i = 0, n = listOfDataBlockToNewArea.size();i < n; ++i) {
+            DataBlock dataBlock = listOfDataBlockToNewArea.get(i);
+            dataBlock.setPosition(pos);
+            pos += dataBlock.getCapacity();
+        }
+    }
+
 
     private DataBlock write(int collectionID,byte[] buffer, boolean compressed) throws IOException {
         if(!compressed) {

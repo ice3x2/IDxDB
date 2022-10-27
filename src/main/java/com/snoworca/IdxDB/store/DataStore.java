@@ -136,6 +136,10 @@ public class DataStore implements Iterable<DataBlock> {
         return block;
     }
 
+    public void write(DataBlock[] dataBlocks) throws IOException {
+        dataWriter.write(dataBlocks);
+    }
+
 
     public void unlink(long pos) throws IOException {
         DataBlock dataBlock = get(pos);
