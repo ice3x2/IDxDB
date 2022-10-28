@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -61,13 +62,13 @@ public class DataWriter {
 
     private byte[] compress(byte[] buffer) {
         if(compressionType == CompressionType.GZIP) {
-            return CompressionUtil.compressGZIP(buffer);
+            return CompressionUtil.compressGZIP(buffer,true);
         }
         else if(compressionType == CompressionType.Deflater) {
-            return CompressionUtil.compressDeflate(buffer);
+            return CompressionUtil.compressDeflate(buffer,true);
         }
         else if(compressionType == CompressionType.SNAPPY) {
-            return CompressionUtil.compressSnappy(buffer);
+            return CompressionUtil.compressSnappy(buffer,true);
         }
         return buffer;
 
@@ -140,7 +141,7 @@ public class DataWriter {
         if(pos < 0) {
             return write(dataBlock.getCollectionId(), buffer, true);
         }
-        if(buffer.length <= dataBlock.getHeader().getCapacity()) {
+        if(buffer.length <= dataBlock.getCapacity()) {
             lock.lock();
             isLock = true;
             try {
@@ -177,12 +178,12 @@ public class DataWriter {
 
     private void initInputDataBlock(DataBlock dataBlock) {
         byte[] buffer = dataBlock.getData();
+        dataBlock.setOriginDataCapacity(buffer.length);
         int capacity = calcCapacity(buffer.length);
         buffer = extendBufferToCapacity(buffer, capacity);
         buffer = compress(buffer);
         capacity = buffer.length;
-        dataBlock.getHeader().setCapacity(capacity);
-
+        dataBlock.setCapacity(capacity);
         dataBlock.setData(buffer);
         dataBlock.setCompressionType((byte)compressionType.getValue());
     }
@@ -190,21 +191,26 @@ public class DataWriter {
 
     void write(DataBlock[] dataBlocks) throws IOException {
         int size = 0;
+
+        ArrayDeque<byte[]> originalBuffers = new ArrayDeque<>();
         ArrayList<DataBlock> listOfDataBlockToNewArea = new ArrayList<>();
         RefByteArrayOutputStream byteArrayOutputStream = new RefByteArrayOutputStream(DEFAULT_BUFFER_LEN);
         for(int i = 0; i < dataBlocks.length; ++i) {
             DataBlock dataBlock = dataBlocks[i];
+            originalBuffers.addLast(dataBlock.getData());
             initInputDataBlock(dataBlock);
-            EmptyBlockPositionPool.EmptyBlockInfo emptyInfo = emptyBlockPositionPool.obtain(dataBlock.getCapacity());
-            size += dataBlock.getCapacity();
+            EmptyBlockPositionPool.EmptyBlockInfo emptyInfo = obtainEmptyBlockPosition(dataBlock.getCapacity());
             if(emptyInfo != null) {
                 dataBlock.setCapacity(emptyInfo.getCapacity());
                 dataBlock.setPosition(emptyInfo.getPosition());
                 replace(dataBlock.getPosition(), dataBlock.getHeader(), dataBlock.getData());
+                dataBlock.setData(originalBuffers.pollLast());
             }
             else {
                 listOfDataBlockToNewArea.add(dataBlock);
-                byteArrayOutputStream.write(dataBlock.toBytes(), 0, dataBlock.getCapacity());
+                byte[] buffer = dataBlock.toBytes();
+                size += buffer.length;
+                byteArrayOutputStream.write(buffer, 0, buffer.length);
             }
         }
         size = byteArrayOutputStream.size();
@@ -215,7 +221,20 @@ public class DataWriter {
         for(int i = 0, n = listOfDataBlockToNewArea.size();i < n; ++i) {
             DataBlock dataBlock = listOfDataBlockToNewArea.get(i);
             dataBlock.setPosition(pos);
-            pos += dataBlock.getCapacity();
+            pos += dataBlock.getCapacity() + DataBlockHeader.HEADER_SIZE;
+            dataBlock.setData(originalBuffers.pollFirst());
+        }
+
+    }
+
+    private EmptyBlockPositionPool.EmptyBlockInfo obtainEmptyBlockPosition(int capacity) {
+        lock.lock();
+        try {
+            isLock = true;
+            return emptyBlockPositionPool.obtain(capacity);
+        } finally {
+            isLock = false;
+            lock.unlock();
         }
     }
 
@@ -223,19 +242,14 @@ public class DataWriter {
     private DataBlock write(int collectionID,byte[] buffer, boolean compressed) throws IOException {
 
         buffer = extendBufferToCapacity(buffer, calcCapacity(buffer.length));
+        int originCapacity = buffer.length;
         if(!compressed) {
             buffer = compress(buffer);
         }
         int capacity = buffer.length;
-        lock.lock();
-        isLock = true;
-        EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo;
-        try {
-            emptyBlockInfo = emptyBlockPositionPool.obtain(capacity);
-        } finally {
-            isLock = false;
-            lock.unlock();
-        }
+
+        EmptyBlockPositionPool.EmptyBlockInfo emptyBlockInfo = obtainEmptyBlockPosition(capacity);
+
         if(emptyBlockInfo != null) {
             long pos = emptyBlockInfo.getPosition();
             DataBlockHeader header =  new DataBlockHeader(collectionID, emptyBlockInfo.getCapacity(), (byte)compressionType.getValue());
@@ -243,12 +257,15 @@ public class DataWriter {
             DataBlock dataBlock = new DataBlock(header);
             dataBlock.setData(buffer);
             dataBlock.setPosition(pos);
+            dataBlock.setOriginDataCapacity(originCapacity);
             return dataBlock;
         }
 
         DataBlock dataBlock = new DataBlock(new DataBlockHeader(collectionID,capacity, (byte)compressionType.getValue()));
+        dataBlock.setCapacity(capacity);
         dataBlock.setData(buffer);
         write(dataBlock);
+        dataBlock.setOriginDataCapacity(originCapacity);
         return dataBlock;
     }
 

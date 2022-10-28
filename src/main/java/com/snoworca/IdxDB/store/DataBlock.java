@@ -10,6 +10,7 @@ public class DataBlock {
     private DataBlockHeader header;
     private byte[] data;
     private long position  = -1;
+    private int originDataCapacity = -1;
 
     private DataBlock() {
 
@@ -53,6 +54,14 @@ public class DataBlock {
 
     public int getCapacity() {
         return header.getCapacity();
+    }
+
+    public int getOriginalCapacity() {
+        return originDataCapacity;
+    }
+
+    public void setOriginDataCapacity(int capacity) {
+        this.originDataCapacity = capacity;
     }
 
     public byte getCompressionType() {
