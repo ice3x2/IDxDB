@@ -24,6 +24,13 @@ public class DataBlock {
         return dataBlock;
     }
 
+    public static DataBlock createReplaceDataBlock(int collectionID,long position, byte[] data) {
+        DataBlock dataBlock = new DataBlock();
+        dataBlock.header = new DataBlockHeader(collectionID,data.length, (byte) 0);
+        dataBlock.data = data;
+        dataBlock.position = position;
+        return dataBlock;
+    }
 
 
     protected DataBlock(DataBlockHeader header) {

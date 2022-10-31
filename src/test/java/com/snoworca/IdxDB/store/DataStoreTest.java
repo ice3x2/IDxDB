@@ -12,6 +12,7 @@ import java.util.Random;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DataStoreTest {
@@ -258,6 +259,50 @@ class DataStoreTest {
         }
         dataStore.close();
         System.out.println(file.length());
+        file.delete();
+    }
+
+
+    @Test
+    public void multiReplaceOrWrite() throws IOException {
+        File file = new File("test.dat");
+        file.delete();
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.5f).setCompressionType(CompressionType.NONE));
+        dataStore.open();
+        Random random = new Random(System.currentTimeMillis());
+        ArrayList<DataBlock> dataBlocks = new ArrayList<>();
+        ArrayList<DataBlock> replaceBlocks = new ArrayList<>();
+        ArrayList<byte[]> replaceBuffer = new ArrayList<>();
+        for(int i = 0; i < 10000; ++i) {
+            dataBlocks.add(dataStore.write(1, getRandomString(random.nextInt(100) + 1).getBytes()));
+        }
+        for(int i = 0, n = dataBlocks.size(); i < n; ++i) {
+            byte[] buffer = getRandomString(random.nextInt(100) + 1).getBytes();
+            replaceBuffer.add(buffer);
+            replaceBlocks.add(DataBlock.createReplaceDataBlock(1, dataBlocks.get(i).getPosition(), buffer));
+        }
+        assertEquals(dataBlocks.size(), replaceBuffer.size());
+        byte[] buffer = getRandomString(random.nextInt(100) + 1).getBytes();
+        replaceBuffer.add(buffer);
+        replaceBlocks.add(DataBlock.createReplaceDataBlock(1, -1, buffer));
+        dataStore.replaceOrWrite(replaceBlocks.toArray(new DataBlock[replaceBlocks.size()]));
+        for(int i = 0, n = replaceBlocks.size(); i < n; ++i) {
+            DataBlock replaceBlock = replaceBlocks.get(i);
+            DataBlock readBlock = dataStore.get(replaceBlock.getPosition());
+            byte[] readData = readBlock.getData();
+            byte[] replaceData = replaceBlock.getData();
+            for(int j = 0, m = replaceBlock.getOriginalCapacity(); j < m; ++j) {
+                assertEquals(replaceData[j], readData[j]);
+            }
+        }
+
+
+
+
+
+
+
+
         file.delete();
     }
 

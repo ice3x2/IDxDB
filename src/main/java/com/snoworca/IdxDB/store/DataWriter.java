@@ -135,7 +135,8 @@ public class DataWriter {
 
 
 
-    DataBlock changeData(DataBlock dataBlock, byte[] buffer) throws IOException {
+    DataBlock changeData(DataBlock dataBlock, byte[] buffer, boolean returnsNullIfChangeFails) throws IOException {
+        int originalCapacity = dataBlock.getCapacity();
         long pos = dataBlock.getPosition();
         buffer = compress(buffer);
         if(pos < 0) {
@@ -147,6 +148,8 @@ public class DataWriter {
             try {
                 replaceSpot(pos + DataBlockHeader.HEADER_SIZE, buffer, 0, buffer.length);
                 dataBlock.setData(buffer);
+                dataBlock.setCapacity(buffer.length);
+                dataBlock.setOriginDataCapacity(originalCapacity);
                 return dataBlock;
             } finally {
                 isLock = false;
@@ -154,7 +157,12 @@ public class DataWriter {
             }
         }
         unlink(pos, dataBlock.getHeader().getCapacity());
-        return write(dataBlock.getCollectionId(), buffer, true);
+        if(!returnsNullIfChangeFails) {
+            return write(dataBlock.getCollectionId(), buffer, true);
+        }
+        return null;
+
+
     }
 
 
@@ -189,12 +197,16 @@ public class DataWriter {
     }
 
 
+
+
     void write(DataBlock[] dataBlocks) throws IOException {
         int size = 0;
 
         ArrayDeque<byte[]> originalBuffers = new ArrayDeque<>();
         ArrayList<DataBlock> listOfDataBlockToNewArea = new ArrayList<>();
         RefByteArrayOutputStream byteArrayOutputStream = new RefByteArrayOutputStream(DEFAULT_BUFFER_LEN);
+
+        DataBlock lastBlock = null;
         for(int i = 0; i < dataBlocks.length; ++i) {
             DataBlock dataBlock = dataBlocks[i];
             originalBuffers.addLast(dataBlock.getData());
@@ -224,7 +236,6 @@ public class DataWriter {
             pos += dataBlock.getCapacity() + DataBlockHeader.HEADER_SIZE;
             dataBlock.setData(originalBuffers.pollFirst());
         }
-
     }
 
     private EmptyBlockPositionPool.EmptyBlockInfo obtainEmptyBlockPosition(int capacity) {
