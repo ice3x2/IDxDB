@@ -61,6 +61,8 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
     }
 
 
+
+
     private Collection<CSONObject> toCSONObjectListFrom(CSONArray csonArray) {
         ArrayList<CSONObject> allList = new ArrayList<>();
         for(int i = 0, n = csonArray.size(); i < n; ++i) {
@@ -72,6 +74,9 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
         }
         return allList;
     }
+
+
+
 
     @Override
     public CSONObject findOneByIndex(Object index) {
@@ -189,6 +194,34 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
             dataStore.unlink(item.getStoragePos(), item.getStoreCapacity());
         }
         return true;
+    }
+
+
+    protected void store(ArrayList<CSONItem> items) throws IOException {
+        DataBlock[] dataBlocks = new DataBlock[items.size()];
+        for(int i = 0, n = items.size(); i < n; ++i) {
+            dataBlocks[i] = DataBlock.createWriteDataBlock(collectionID, items.get(i).getCsonObject().toBytes());
+        }
+        dataStore.write(dataBlocks);
+        for(int i = 0, n = items.size(); i < n; ++i) {
+            CSONItem csonItem = items.get(i);
+            csonItem.setStoragePos_(dataBlocks[i].getPosition());
+            csonItem.setStoreCapacity(dataBlocks[i].getCapacity());
+        }
+    }
+
+    protected void replaceOrStore(ArrayList<CSONItem> items) throws IOException {
+        DataBlock[] dataBlocks = new DataBlock[items.size()];
+        for(int i = 0, n = items.size(); i < n; ++i) {
+            CSONItem csonItem = items.get(i);
+            dataBlocks[i] = DataBlock.createReplaceDataBlock(collectionID,csonItem.getStoragePos(),csonItem.getCsonObject().toBytes());
+        }
+        dataStore.replaceOrWrite(dataBlocks);
+        for(int i = 0, n = items.size(); i < n; ++i) {
+            CSONItem csonItem = items.get(i);
+            csonItem.setStoragePos_(dataBlocks[i].getPosition());
+            csonItem.setStoreCapacity(dataBlocks[i].getCapacity());
+        }
     }
 
     protected String getIndexKey() {

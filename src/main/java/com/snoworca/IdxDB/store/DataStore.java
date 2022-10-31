@@ -174,6 +174,11 @@ public class DataStore implements Iterable<DataBlock> {
     }
 
     public void unlink(long pos, int capacity) throws IOException {
+        if(capacity <= 0) {
+            unlink(pos);
+            return;
+        }
+
          dataWriter.unlink(pos, capacity);
     }
 

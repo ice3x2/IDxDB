@@ -11,6 +11,17 @@ class CSONItem implements Comparable<CSONItem> {
     private final static Pattern NUM_PATTERN = Pattern.compile("[+-]?([0-9]*[.])?[0-9]+");
 
 
+    static CSONItem createIndexItem(Object indexValue, int sort) {
+        CSONItem csonItem = new CSONItem();
+        csonItem.indexValue = indexValue;
+        csonItem.sort = sort;
+        return csonItem;
+
+    }
+
+
+    private CSONItem() {}
+
     CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String IndexKey, int sort, boolean memCacheIndex) {
         this.storeDelegator = storeDelegator;
         this.indexKey = IndexKey;
@@ -105,6 +116,13 @@ class CSONItem implements Comparable<CSONItem> {
         isStorageSaved = true;
         isChanged = false;
     }
+
+
+    public void clearCache() {
+        if(!isMemCacheIndex) this.indexValue = null;
+        this.csonObject = null;
+    }
+
 
 
     public void setStore(boolean enable) {
