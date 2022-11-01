@@ -11,6 +11,17 @@ class CSONItem implements Comparable<CSONItem> {
     private final static Pattern NUM_PATTERN = Pattern.compile("[+-]?([0-9]*[.])?[0-9]+");
 
 
+    static CSONItem createIndexItem(Object indexValue, int sort) {
+        CSONItem csonItem = new CSONItem();
+        csonItem.indexValue = indexValue;
+        csonItem.sort = sort;
+        return csonItem;
+
+    }
+
+
+    private CSONItem() {}
+
     CSONItem(StoreDelegator storeDelegator, CSONObject csonObject, String IndexKey, int sort, boolean memCacheIndex) {
         this.storeDelegator = storeDelegator;
         this.indexKey = IndexKey;
@@ -20,6 +31,17 @@ class CSONItem implements Comparable<CSONItem> {
         this.isMemCacheIndex = memCacheIndex;
         if(this.indexValue == null) {
             throw new MissingIndexValueException(indexKey, csonObject);
+        }
+    }
+
+    CSONItem(StoreDelegator storeDelegator, String indexValue, String IndexKey, int sort, boolean memCacheIndex) {
+        this.storeDelegator = storeDelegator;
+        this.indexKey = IndexKey;
+        this.sort = sort;
+        this.indexValue = indexValue;
+        this.isMemCacheIndex = memCacheIndex;
+        if(this.indexValue == null) {
+            throw new MissingIndexValueException(indexKey, new CSONObject());
         }
     }
 
@@ -43,7 +65,7 @@ class CSONItem implements Comparable<CSONItem> {
     public CSONObject getCsonObject() {
         if(csonObject == null) {
             StoredInfo info = storeDelegator.loadData(dataPos);
-            csonObject = info.getCsonObject();
+            CSONObject csonObject = info.getCsonObject();
             storeCapacity = info.getCapacity();
             dataPos = info.getPosition();
             return csonObject;
@@ -70,36 +92,42 @@ class CSONItem implements Comparable<CSONItem> {
         return storagePos;
     }*/
 
-    public void storeIfNeed() {
-        if(dataPos > -1) return;
-        store();
-    }
-
     public void release() {
         dataPos = -1;
         csonObject = null;
         storeDelegator = null;
+        indexValue = null;
+        indexKey = null;
+        storeCapacity = -1;
     }
 
 
-    private void store() {
-        if(csonObject == null) return;
-        Object indexVal = indexValue;
-        if(indexVal == null) {
-            indexVal = csonObject.get(indexKey);
+
+    public void clearCache() {
+        if(!isMemCacheIndex)  {
+            this.indexValue = null;
         }
-        StoredInfo info = storeDelegator.storeData(dataPos, csonObject);
-        dataPos = info.getPosition();
-        storeCapacity = info.getCapacity();
-        isStorageSaved = true;
-        isChanged = false;
+        this.csonObject = null;
+    }
+
+    public void clearIndexCache() {
+        if(!isMemCacheIndex) this.indexValue = null;
+    }
+
+    public void cache() {
+        if(this.csonObject == null) {
+            this.csonObject = getCsonObject();
+            if(this.indexValue == null) {
+                this.indexValue = this.csonObject.opt(indexKey);
+            }
+        }
     }
 
 
-    public void setStore(boolean enable) {
+    public void setStore_(boolean enable) {
         if(enable) {
             if(this.csonObject != null && (!isStorageSaved || isChanged)) {
-                store();
+                //store();
             }
             if(!isMemCacheIndex) this.indexValue = null;
             this.csonObject = null;
@@ -115,7 +143,6 @@ class CSONItem implements Comparable<CSONItem> {
 
     public void replace(CSONObject jsonObject) {
         setCsonObject(jsonObject);
-        store();
     }
 
 

@@ -1,12 +1,18 @@
 package com.snoworca.IdxDB.store;
 
+import com.snoworca.IdxDB.CompressionType;
+import com.snoworca.cson.CSONArray;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DataStoreTest {
@@ -118,16 +124,120 @@ class DataStoreTest {
         }
         dataStore.close();
         file.delete();
+    }
+
+    @Test
+    void compressTest() throws IOException {
+        compressTest(CompressionType.NONE);
+        compressTest(CompressionType.GZIP);
+        compressTest(CompressionType.SNAPPY);
+        compressTest(CompressionType.Deflater);
 
     }
 
+    void compressTest(CompressionType type) throws IOException {
+        File file = new File("test.dat");
+        file.delete();
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(type));
+        dataStore.open();
+        String str = getRandomString(100) + "\0";
+        System.out.println(str);
+        int len = str.getBytes().length;
+        long pos = dataStore.write(1, str.getBytes()).getPosition();
+        byte[] buffer = dataStore.get(pos).getData();
+        System.out.println(new String(buffer));
+        assertEquals(str, new String(buffer,0,len));
+
+    }
+
+    @Test
+    void multiWriteTest() throws IOException {
+        File file = new File("test.dat");
+        file.delete();
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f).setCompressionType(CompressionType.Deflater));
+        dataStore.open();
+        ArrayList<DataBlock> dataBlocks = new ArrayList<>();
+        ArrayList<CSONArray> datas = new ArrayList<>();
+        dataStore.write(100, getRandomString(10000).getBytes());
+        for(int i = 0; i < 10000; ++i) {
+           CSONArray csonArray = new CSONArray().push(getRandomString(1000));
+           datas.add(csonArray);
+           dataBlocks.add(DataBlock.createWriteDataBlock(1, csonArray.toByteArray()));
+        }
+        dataStore.write(dataBlocks.toArray(new DataBlock[dataBlocks.size()]));
+        assertEquals(dataBlocks.size(), datas.size());
+        for(int i = 0, n = dataBlocks.size(); i < n; ++i) {
+            DataBlock dataBlock = dataBlocks.get(i);
+            assertEquals(dataBlock.getData().length, dataBlock.getOriginalCapacity());
+            assertEquals(new CSONArray(dataBlock.getData()).get(0), datas.get(i).get(0));
+        }
+        Random random = new Random(System.currentTimeMillis());
+        Iterator<DataBlock> iterator = dataBlocks.iterator();
+        int removeCount = 0;
+        while(iterator.hasNext()) {
+            DataBlock dataBlock = iterator.next();
+            if(random.nextInt(3)  == 0) {
+                dataStore.unlink(dataBlock.getPosition(), dataBlock.getOriginalCapacity());
+                iterator.remove();
+                ++removeCount;
+            }
+        }
+        dataBlocks.clear();
+        datas.clear();
+        assertEquals(removeCount, dataStore.getEmptyBlockPositionPoolSize());
+        for(int i = 0, n = removeCount * 2; i < n; ++i) {
+            CSONArray csonArray = new CSONArray().push(getRandomString(1000));
+            datas.add(csonArray);
+            dataBlocks.add(DataBlock.createWriteDataBlock(1, csonArray.toByteArray()));
+        }
+        dataStore.write(dataBlocks.toArray(new DataBlock[dataBlocks.size()]));
+        assertEquals(0, dataStore.getEmptyBlockPositionPoolSize());
+
+        for(int i = 0, n = dataBlocks.size(); i < n; ++i) {
+            DataBlock dataBlock = dataBlocks.get(i);
+            assertEquals(dataBlock.getData().length, dataBlock.getOriginalCapacity());
+            assertEquals(new CSONArray(dataBlock.getData()).get(0), datas.get(i).get(0));
+        }
+
+        dataStore.close();
+        file.delete();
+    }
+
+
+    @Test
+    void changeDataWithCompressTest() throws IOException {
+        File file = new File("test.dat");
+        file.delete();
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.5f).setCompressionType(CompressionType.SNAPPY));
+        dataStore.open();
+        Random random = new Random(System.currentTimeMillis());
+        dataStore.write(1, getRandomString(random.nextInt(10000) + 1).getBytes());
+        byte[] buffer = getRandomString(10000).getBytes();
+        long pos = dataStore.write(1, buffer).getPosition();
+        DataBlock readBlock = dataStore.get(pos);
+        byte[] readData = readBlock.getData();
+        for(int i = 0, n = buffer.length; i < n; ++i) {
+            assertEquals(buffer[i], readData[i]);
+        }
+        buffer = getRandomString(100).getBytes();
+        long changePos = dataStore.replaceOrWrite(1, buffer, readBlock.getPosition()).getPosition();
+        assertEquals(pos,changePos);
+
+        readBlock = dataStore.get(changePos);
+        readData = readBlock.getData();
+        for(int i = 0, n = 100; i < n; ++i) {
+            assertEquals(buffer[i], readData[i]);
+        }
+        dataStore.close();
+        System.out.println(file.length());
+        file.delete();
+    }
 
     @Test
     void changeDataTest() throws IOException {
         File file = new File("test.dat");
         file.delete();
-        DataStoreOptions options = new DataStoreOptions();
-        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.3f));
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.5f).setCompressionType(CompressionType.NONE));
         dataStore.open();
         Random random = new Random(System.currentTimeMillis());
         dataStore.write(1, getRandomString(random.nextInt(10000) + 1).getBytes());
@@ -148,7 +258,77 @@ class DataStoreTest {
             assertEquals(buffer[i], readData[i]);
         }
         dataStore.close();
+        System.out.println(file.length());
         file.delete();
+    }
+
+
+    @Test
+    public void multiReplaceOrWrite() throws IOException {
+        File file = new File("test.dat");
+        file.delete();
+        DataStore dataStore = new DataStore(file, new DataStoreOptions().setCapacityRatio(0.5f).setCompressionType(CompressionType.NONE));
+        dataStore.open();
+        Random random = new Random(System.currentTimeMillis());
+        ArrayList<DataBlock> dataBlocks = new ArrayList<>();
+        ArrayList<DataBlock> replaceBlocks = new ArrayList<>();
+        ArrayList<byte[]> replaceBuffer = new ArrayList<>();
+        for(int i = 0; i < 10000; ++i) {
+            dataBlocks.add(dataStore.write(1, getRandomString(random.nextInt(100) + 1).getBytes()));
+        }
+        for(int i = 0, n = dataBlocks.size(); i < n; ++i) {
+            byte[] buffer = getRandomString(random.nextInt(100) + 1).getBytes();
+            replaceBuffer.add(buffer);
+            replaceBlocks.add(DataBlock.createReplaceDataBlock(1, dataBlocks.get(i).getPosition(), buffer));
+        }
+        assertEquals(dataBlocks.size(), replaceBuffer.size());
+        byte[] buffer = getRandomString(random.nextInt(100) + 1).getBytes();
+        replaceBuffer.add(buffer);
+        replaceBlocks.add(DataBlock.createReplaceDataBlock(1, -1, buffer));
+        dataStore.replaceOrWrite(replaceBlocks.toArray(new DataBlock[replaceBlocks.size()]));
+        for(int i = 0, n = replaceBlocks.size(); i < n; ++i) {
+            DataBlock replaceBlock = replaceBlocks.get(i);
+            DataBlock readBlock = dataStore.get(replaceBlock.getPosition());
+            byte[] readData = readBlock.getData();
+            byte[] replaceData = replaceBlock.getData();
+            for(int j = 0, m = replaceBlock.getOriginalCapacity(); j < m; ++j) {
+                assertEquals(replaceData[j], readData[j]);
+            }
+        }
+
+
+
+
+
+
+
+
+        file.delete();
+    }
+
+    @Test
+    public void syncTest() {
+
+        ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+        Object monitor = new Object();
+        long start = System.currentTimeMillis();
+        long k = 0;
+        ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
+        for(int i = 0; i < 10000000; ++i) {
+            readLock.lock();
+            ++k;
+            readLock.unlock();
+        }
+        System.out.println(System.currentTimeMillis() - start);
+        start = System.currentTimeMillis();
+        k = 0;
+        for(int i = 0; i < 10000000; ++i) {
+
+                ++k;
+
+        }
+
+        System.out.println(System.currentTimeMillis() - start);
     }
 
 }

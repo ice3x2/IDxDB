@@ -2,6 +2,7 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
+import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.cson.CSONObject;
 
@@ -59,10 +60,13 @@ public class IndexTreeSet extends IndexCollectionBase {
             csonItem.storeIfNeed();
             */
             boolean isMemCache = count > memCacheLimit;
-            csonItem.setStore(isMemCache);
             if(isMemCache) {
+                csonItem.cache();
                 cacheSet.add(csonItem);
+            } else {
+                csonItem.clearCache();
             }
+
             ++count;
         }
     }
@@ -79,66 +83,107 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     private void removeCache(int memCacheSize , CSONItem item) {
         if(memCacheSize <= 0) return;
-        cacheSet.remove(item);
-        Set<CSONItem> subSet = cacheSet.isEmpty() ? itemSet : itemSet.tailSet(cacheSet.last(), false);
-        Iterator<CSONItem> iterator = subSet.iterator();
-        while(iterator.hasNext() && cacheSet.size() < memCacheSize) {
-            CSONItem csonItem = iterator.next();
-            cacheSet.add(csonItem);
-            csonItem.setStore(false);
+        cacheSet.remove(CSONItem.createIndexItem(item.getIndexValue(), indexSort));
+        item.clearCache();
+
+    }
+
+    private void onCache(int memCacheSize) {
+        if(memCacheSize <= 0) return;
+        int count = cacheSet.size();
+        int csonItemIndex = 0;
+        if(count == memCacheSize) {
+            return;
+        }
+        Iterator<CSONItem> itemSetIterator = itemSet.iterator();
+        Iterator<CSONItem> cacheIterator = cacheSet.iterator();
+
+        while (itemSetIterator.hasNext()) {
+            CSONItem item = itemSetIterator.next();
+            CSONItem cacheItem = null;
+            if(count >= memCacheSize) {
+                break;
+            }
+            if(csonItemIndex < count) {
+                if(cacheIterator.hasNext()) {
+                    cacheItem = cacheIterator.next();
+                    cacheItem.cache();
+                }
+                ++csonItemIndex;
+                continue;
+            }
+            item.cache();
+            cacheSet.add(item);
+            ++count;
+        }
+        cacheIterator = cacheSet.iterator();
+        while (cacheIterator.hasNext()) {
+            CSONItem cacheItem = cacheIterator.next();
+            cacheItem.cache();
         }
     }
 
 
-    private void addCache(int memCacheSize , CSONItem item) {
-        if(memCacheSize <= 0) return;
+    private CSONItem addCache(int memCacheSize , CSONItem item) {
+        if(memCacheSize <= 0) return item;
         cacheSet.add(item);
         if (cacheSet.size() > memCacheSize) {
             CSONItem csonItem = cacheSet.pollLast();
             if(csonItem != null) {
-                csonItem.setStore(true);
+                return csonItem;
             }
         }
+        return null;
+    }
+
+    protected CSONItem getCSONItem(Object index) {
+
+        CSONItem csonItem = itemSet.floor(CSONItem.createIndexItem(index, indexSort));
+        if(csonItem != null && csonItem.compareIndex(index) == 0) {
+            return csonItem;
+        }
+        return null;
     }
 
 
     @Override
     public synchronized CommitResult commit() {
-
         ArrayList<TransactionOrder> transactionOrders = getTransactionOrders();
+        ArrayList<CSONItem> clearCacheList = new ArrayList<>();
+        ArrayList<CSONItem> writeItemList = new ArrayList<>();
+        ArrayList<CSONItem> writeOrReplaceItemList = new ArrayList<>();
         writeLock();
         CommitResult commitResult = new CommitResult();
+        if(transactionOrders.isEmpty()) {
+            return commitResult;
+        }
         int memCacheSize = getMemCacheSize();
         try {
-            if(transactionOrders.isEmpty()) {
-                return commitResult;
-            }
-            boolean indexChanged = false;
+            CSONItem foundItem = null;
             for(int i = 0, n = transactionOrders.size(); i < n; ++i) {
                 TransactionOrder transactionOrder = transactionOrders.get(i);
                 CSONItem item = transactionOrder.getItem();
                 switch (transactionOrder.getOrder()) {
                     case TransactionOrder.ORDER_ADD:
                         if(itemSet.add(item)) {
-                            addCache(memCacheSize, item);
+                            CSONItem clearCacheItem = addCache(memCacheSize, item);
+                            if(clearCacheItem != null) {
+                                clearCacheList.add(clearCacheItem);
+                            }
                             commitResult.incrementCountOfAdd();
                         }
-                        item.storeIfNeed();
-                        indexChanged = true;
-                    break;
+                        writeItemList.add(item);
+                        break;
                     case TransactionOrder.ORDER_REMOVE:
-                        if(!item.isStored()) {
-                            CSONItem realItem = get_(item.getCsonObject());
-                            if(realItem != null) item = realItem;
-                        }
-                        if(itemSet.remove(item)) {
+                        foundItem = null;
+                        foundItem = getCSONItem(item.getIndexValue());
+                        if(foundItem != null && itemSet.remove(foundItem)) {
                             removeCache(memCacheSize, item);
                             commitResult.incrementCountOfRemove();
+                            unlink(foundItem);
+                            foundItem.release();
                         }
-                        unlink(item);
-                        item.release();
-                        indexChanged = true;
-                    break;
+                        break;
                     case TransactionOrder.ORDER_CLEAR:
                         for(CSONItem clearItem : itemSet) {
                             unlink(clearItem);
@@ -147,45 +192,42 @@ public class IndexTreeSet extends IndexCollectionBase {
                         }
                         cacheSet.clear();
                         itemSet.clear();
-                    break;
+                        break;
                     case TransactionOrder.ORDER_ADD_OR_REPLACE:
-                        CSONObject addOrReplaceCsonObject = item.getCsonObject();
-                        CSONItem foundItemOfAddOrReplace = get_(addOrReplaceCsonObject);
-                        if(foundItemOfAddOrReplace == null) {
+                        foundItem = null;
+                        foundItem = getCSONItem(item.getIndexValue());
+                        if(foundItem == null) {
                             itemSet.add(item);
-                            addCache(memCacheSize, item);
-                            item.storeIfNeed();
+                            CSONItem clearCacheItem = addCache(memCacheSize, item);
+                            if(clearCacheItem != null) {
+                                clearCacheList.add(clearCacheItem);
+                            }
                             commitResult.incrementCountOfAdd();
-                        } else {
-                            if(!foundItemOfAddOrReplace.isStored()) {
-                                CSONItem foundItemOfAddOrReplaceReal = get_(foundItemOfAddOrReplace.getCsonObject());
-                                if(foundItemOfAddOrReplaceReal != null) {
-                                    foundItemOfAddOrReplace = foundItemOfAddOrReplaceReal;
-                                }
-                            }
-                            foundItemOfAddOrReplace.replace(addOrReplaceCsonObject);
+                        }
+                        else {
+                            foundItem.setCsonObject(item.getCsonObject());
+                            item = foundItem;
                             commitResult.incrementCountOfReplace();
                         }
-                    break;
+                        writeOrReplaceItemList.add(item);
+                        break;
                     case TransactionOrder.ORDER_REPLACE:
-                        CSONObject replaceCsonObject = item.getCsonObject();
-                        CSONItem foundItemOfReplace = get_(replaceCsonObject);
-                        if(foundItemOfReplace != null) {
-                            if(!foundItemOfReplace.isStored()) {
-                                CSONItem foundItemOfReplaceReal = get_(foundItemOfReplace.getCsonObject());
-                                if(foundItemOfReplaceReal != null) {
-                                    foundItemOfReplace = foundItemOfReplaceReal;
-                                }
-                            }
-                            foundItemOfReplace.replace(replaceCsonObject);
+                        foundItem = null;
+                        foundItem = getCSONItem(item.getIndexValue());
+                        if(foundItem != null) {
+                            foundItem.setCsonObject(item.getCsonObject());
                             commitResult.incrementCountOfReplace();
+                            writeOrReplaceItemList.add(foundItem);
                         }
-                    break;
+                        break;
                 }
             }
-            //onMemStore();
-
-
+            store(writeItemList);
+            replaceOrStore(writeOrReplaceItemList);
+            clearCache(clearCacheList);
+            clearCache(writeItemList);
+            clearCache(writeOrReplaceItemList);
+            onCache(memCacheSize);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
@@ -195,6 +237,8 @@ public class IndexTreeSet extends IndexCollectionBase {
         return commitResult;
 
     }
+
+
 
     @Override
     public boolean isEmpty() {
@@ -458,7 +502,8 @@ public class IndexTreeSet extends IndexCollectionBase {
     @Override
     public void restore(StoredInfo info) {
         CSONObject csonObject = info.getCsonObject();
-        CSONItem csonItem = new CSONItem(storeDelegator, csonObject,indexKey, indexSort, isMemCacheIndex);
+        String indexKey = getIndexKey();
+        CSONItem csonItem = new CSONItem(getStoreDelegator(), csonObject.optString(indexKey),indexKey, getSort(), isMemCacheIndex);
         csonItem.setStoreCapacity(info.getCapacity());
         csonItem.setStoragePos_(info.getPosition());
         itemSet.add(csonItem);

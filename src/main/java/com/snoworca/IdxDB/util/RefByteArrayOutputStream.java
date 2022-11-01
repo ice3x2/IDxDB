@@ -23,7 +23,7 @@ public class RefByteArrayOutputStream extends ByteArrayOutputStream {
     }
 
 
-    public byte[] getByteArray() {
+    public byte[] getBuffer() {
         return buf;
     }
 }

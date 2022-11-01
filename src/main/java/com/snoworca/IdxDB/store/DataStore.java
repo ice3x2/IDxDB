@@ -5,8 +5,7 @@ import com.snoworca.IdxDB.exception.AccessOutOfRangePositionDataException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -118,8 +117,6 @@ public class DataStore implements Iterable<DataBlock> {
         return get(pos).getData();
     }
 
-
-
     public DataBlock replaceOrWrite(int collectionID, byte[] buffer, long pos) throws IOException {
         if(pos < 0) {
             return write(collectionID, buffer);
@@ -128,12 +125,45 @@ public class DataStore implements Iterable<DataBlock> {
         if(dataBlock == null) {
             return write(collectionID, buffer);
         }
-        return dataWriter.changeData(dataBlock, buffer);
+        return dataWriter.changeData(dataBlock, buffer, false);
+    }
+
+    public void replaceOrWrite(DataBlock[] dataBlocks) throws IOException {
+
+
+        ArrayList<DataBlock> writeBlockList = new ArrayList<>();
+        for(int i = 0, n = dataBlocks.length; i < n; ++i) {
+            DataBlock dataBlock = dataBlocks[i];
+            long pos = dataBlock.getPosition();
+            if(pos < 0) {
+                writeBlockList.add(dataBlock);
+                continue;
+            }
+            DataBlock readBlock = get(pos);
+            if(readBlock == null) {
+                writeBlockList.add(dataBlock);
+            } else {
+                DataBlock changedBlock = dataWriter.changeData(readBlock, dataBlock.getData(), true);
+                if (changedBlock == null) {
+                    writeBlockList.add(dataBlock);
+                } else {
+                    dataBlock.setCapacity(changedBlock.getCapacity());
+                    dataBlock.setOriginDataCapacity(dataBlock.getData().length);
+                }
+
+            }
+        }
+        write(writeBlockList.toArray(new DataBlock[writeBlockList.size()]));
     }
 
     public DataBlock write(int collectionID, byte[] buffer) throws IOException {
         DataBlock block = dataWriter.write(collectionID, buffer);
         return block;
+    }
+
+    public void write(DataBlock[] dataBlocks) throws IOException {
+        if(dataBlocks.length  == 0) return;
+        dataWriter.write(dataBlocks);
     }
 
 
@@ -144,6 +174,11 @@ public class DataStore implements Iterable<DataBlock> {
     }
 
     public void unlink(long pos, int capacity) throws IOException {
+        if(capacity <= 0) {
+            unlink(pos);
+            return;
+        }
+
          dataWriter.unlink(pos, capacity);
     }
 

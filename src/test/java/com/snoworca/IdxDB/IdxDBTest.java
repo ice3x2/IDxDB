@@ -182,6 +182,7 @@ class IdxDBTest {
 
         start = System.currentTimeMillis();
         list = indexLinkedMap.list(1000, false);
+        System.out.println( (System.currentTimeMillis() - start) + "ms");
         assertTrue((System.currentTimeMillis() - start) < 2);
         assertEquals("2000",list.get(0).get("str"));
         assertEquals("3000",list.get(1).get("str"));

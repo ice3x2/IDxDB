@@ -1,16 +1,37 @@
 package com.snoworca.IdxDB.store;
 
+import com.snoworca.IdxDB.CompressionType;
+
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class DataBlock {
 
     private DataBlockHeader header;
     private byte[] data;
     private long position  = -1;
+    private int originDataCapacity = -1;
 
     private DataBlock() {
 
     }
+
+    public static DataBlock createWriteDataBlock(int collectionID,byte[] data) {
+        DataBlock dataBlock = new DataBlock();
+        dataBlock.header = new DataBlockHeader(collectionID,data.length, (byte) 0);
+        dataBlock.data = data;
+        dataBlock.position = -1;
+        return dataBlock;
+    }
+
+    public static DataBlock createReplaceDataBlock(int collectionID,long position, byte[] data) {
+        DataBlock dataBlock = new DataBlock();
+        dataBlock.header = new DataBlockHeader(collectionID,data.length, (byte) 0);
+        dataBlock.data = data;
+        dataBlock.position = position;
+        return dataBlock;
+    }
+
 
     protected DataBlock(DataBlockHeader header) {
         this.header = header;
@@ -40,6 +61,14 @@ public class DataBlock {
 
     public int getCapacity() {
         return header.getCapacity();
+    }
+
+    public int getOriginalCapacity() {
+        return originDataCapacity;
+    }
+
+    public void setOriginDataCapacity(int capacity) {
+        this.originDataCapacity = capacity;
     }
 
     public byte getCompressionType() {

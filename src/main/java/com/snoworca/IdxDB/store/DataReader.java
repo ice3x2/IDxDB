@@ -63,11 +63,11 @@ public class DataReader {
 
     private byte[] decompress(CompressionType compressionType, byte[] buffer) {
         if(compressionType == CompressionType.GZIP) {
-            return CompressionUtil.decompressGZIP(buffer, 0, buffer.length);
+            return CompressionUtil.decompressGZIP(buffer, 0, buffer.length, true);
         } else if(compressionType == CompressionType.Deflater) {
-            return CompressionUtil.decompressDeflate(buffer, 0, buffer.length);
+            return CompressionUtil.decompressDeflate(buffer, 0, buffer.length, true);
         } else if(compressionType == CompressionType.SNAPPY) {
-            return CompressionUtil.decompressSnappy(buffer, 0, buffer.length);
+            return CompressionUtil.decompressSnappy(buffer, 0, buffer.length, true);
         }
         return buffer;
     }
