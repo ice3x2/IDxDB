@@ -26,30 +26,30 @@ public class IndexMemCacheOptionTest {
         }
         collectionMemCache.commit();
         collectionNoCache.commit();
+
+        for(int i = 50000; i < 100000; ++i) {
+            collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));
+            collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i));
+        }
+        collectionMemCache.commit();
+        collectionNoCache.commit();
         System.out.println("초기화완료");
 
         long start = System.currentTimeMillis();
-        for(int i = 50000; i < 100000; ++i) {
-            collectionMemCache.add(new CSONObject().put("key", i + "").put("value", i));
-            collectionMemCache.commit();
+        for(int i = 60000; i < 80000; ++i) {
+            collectionMemCache.removeByIndex(i  + "");
         }
-        collectionMemCache.removeByIndex("1");
-        collectionMemCache.removeByIndex("50000");
-        collectionMemCache.removeByIndex("100000");
         collectionMemCache.commit();
-
         long timeLap1 = System.currentTimeMillis() - start + 1;
         System.out.println("인덱스 값 메모리 캐쉬:" + timeLap1 + "ms");
 
+
+
         start = System.currentTimeMillis();
-        for(int i = 50000; i < 100000; ++i) {
-            collectionNoCache.add(new CSONObject().put("key", i + "").put("value", i));
-            collectionNoCache.commit();
+        for(int i = 60000; i < 80000; ++i) {
+            collectionNoCache.removeByIndex(i  + "");
         }
-        collectionMemCache.removeByIndex("1");
-        collectionMemCache.removeByIndex("50000");
-        collectionMemCache.removeByIndex("100000");
-        collectionMemCache.commit();
+        collectionNoCache.commit();
         long timeLap2 = System.currentTimeMillis() - start + 1;
         System.out.println("인덱스 값 노 캐쉬:"+ timeLap2 + "ms");
 

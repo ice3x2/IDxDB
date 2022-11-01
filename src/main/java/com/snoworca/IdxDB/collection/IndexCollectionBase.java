@@ -224,6 +224,12 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
         }
     }
 
+    protected void clearCache(ArrayList<CSONItem> items) {
+        for(int i = 0, n = items.size(); i < n; ++i) {
+            items.get(i).clearCache();
+        }
+    }
+
     protected String getIndexKey() {
         return indexKey;
     }

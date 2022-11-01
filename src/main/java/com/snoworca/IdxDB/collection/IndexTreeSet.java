@@ -90,16 +90,25 @@ public class IndexTreeSet extends IndexCollectionBase {
         if(count == memCacheSize) {
             return;
         }
-        for (CSONItem csonItem : itemSet) {
+        Iterator<CSONItem> itemSetIterator = itemSet.iterator();
+        Iterator<CSONItem> cacheIterator = cacheSet.iterator();
+
+        while (itemSetIterator.hasNext()) {
+            CSONItem item = itemSetIterator.next();
+            CSONItem cacheItem = null;
             if(count > memCacheSize) {
                 break;
             }
             if(csonItemIndex < count) {
+                if(cacheIterator.hasNext()) {
+                    cacheItem = cacheIterator.next();
+                    cacheItem.setStore(false);
+                }
                 ++csonItemIndex;
                 continue;
             }
-            csonItem.setStore(false);
-            cacheSet.add(csonItem);
+            item.setStore(false);
+            cacheSet.add(item);
             ++count;
 
         }
@@ -206,12 +215,10 @@ public class IndexTreeSet extends IndexCollectionBase {
             }
             store(writeItemList);
             replaceOrStore(writeOrReplaceItemList);
-            for(int i = 0, n = clearCacheList.size(); i < n; ++i) {
-                CSONItem clearCacheItem = clearCacheList.get(i);
-                clearCacheItem.clearCache();
-            }
+            clearCache(clearCacheList);
+            clearCache(writeItemList);
+            clearCache(writeOrReplaceItemList);
             onCache(memCacheSize);
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
