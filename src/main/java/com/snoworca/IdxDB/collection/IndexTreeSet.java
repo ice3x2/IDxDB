@@ -60,10 +60,13 @@ public class IndexTreeSet extends IndexCollectionBase {
             csonItem.storeIfNeed();
             */
             boolean isMemCache = count > memCacheLimit;
-            csonItem.setStore(isMemCache);
             if(isMemCache) {
+                csonItem.cache();
                 cacheSet.add(csonItem);
+            } else {
+                csonItem.clearCache();
             }
+
             ++count;
         }
     }
@@ -80,7 +83,9 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     private void removeCache(int memCacheSize , CSONItem item) {
         if(memCacheSize <= 0) return;
-        cacheSet.remove(item);
+        cacheSet.remove(CSONItem.createIndexItem(item.getIndexValue(), indexSort));
+        item.clearCache();
+
     }
 
     private void onCache(int memCacheSize) {
@@ -96,27 +101,31 @@ public class IndexTreeSet extends IndexCollectionBase {
         while (itemSetIterator.hasNext()) {
             CSONItem item = itemSetIterator.next();
             CSONItem cacheItem = null;
-            if(count > memCacheSize) {
+            if(count >= memCacheSize) {
                 break;
             }
             if(csonItemIndex < count) {
                 if(cacheIterator.hasNext()) {
                     cacheItem = cacheIterator.next();
-                    cacheItem.setStore(false);
+                    cacheItem.cache();
                 }
                 ++csonItemIndex;
                 continue;
             }
-            item.setStore(false);
+            item.cache();
             cacheSet.add(item);
             ++count;
-
+        }
+        cacheIterator = cacheSet.iterator();
+        while (cacheIterator.hasNext()) {
+            CSONItem cacheItem = cacheIterator.next();
+            cacheItem.cache();
         }
     }
 
 
     private CSONItem addCache(int memCacheSize , CSONItem item) {
-        if(memCacheSize <= 0) return null;
+        if(memCacheSize <= 0) return item;
         cacheSet.add(item);
         if (cacheSet.size() > memCacheSize) {
             CSONItem csonItem = cacheSet.pollLast();

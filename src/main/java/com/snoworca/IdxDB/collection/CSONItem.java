@@ -92,30 +92,15 @@ class CSONItem implements Comparable<CSONItem> {
         return storagePos;
     }*/
 
-    public void storeIfNeed() {
-        if(dataPos > -1) return;
-        store();
-    }
-
     public void release() {
         dataPos = -1;
         csonObject = null;
         storeDelegator = null;
+        indexValue = null;
+        indexKey = null;
+        storeCapacity = -1;
     }
 
-
-    private void store() {
-        if(csonObject == null) return;
-        Object indexVal = indexValue;
-        if(indexVal == null && isMemCacheIndex)  {
-            indexValue = csonObject.get(indexKey);
-        }
-        StoredInfo info = storeDelegator.storeData(dataPos, csonObject);
-        dataPos = info.getPosition();
-        storeCapacity = info.getCapacity();
-        isStorageSaved = true;
-        isChanged = false;
-    }
 
 
     public void clearCache() {
@@ -129,11 +114,20 @@ class CSONItem implements Comparable<CSONItem> {
         if(!isMemCacheIndex) this.indexValue = null;
     }
 
+    public void cache() {
+        if(this.csonObject == null) {
+            this.csonObject = getCsonObject();
+            if(this.indexValue == null) {
+                this.indexValue = this.csonObject.opt(indexKey);
+            }
+        }
+    }
 
-    public void setStore(boolean enable) {
+
+    public void setStore_(boolean enable) {
         if(enable) {
             if(this.csonObject != null && (!isStorageSaved || isChanged)) {
-                store();
+                //store();
             }
             if(!isMemCacheIndex) this.indexValue = null;
             this.csonObject = null;
@@ -149,7 +143,6 @@ class CSONItem implements Comparable<CSONItem> {
 
     public void replace(CSONObject jsonObject) {
         setCsonObject(jsonObject);
-        store();
     }
 
 

@@ -406,22 +406,6 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
     protected void makeStoreDelegatorImpl() {
         storeDelegator = new StoreDelegator() {
 
-            @Override
-            public StoredInfo storeData(long pos, CSONObject csonObject) {
-                byte[] buffer = csonObject.toBytes();
-                DataBlock dataBlock;
-                try {
-                    if (pos == -1) {
-                        dataBlock = dataStore.write(collectionID, buffer);
-                    } else {
-                        dataBlock = dataStore.replaceOrWrite(collectionID, buffer, pos);
-                    }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                return new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity());
-            }
-
 
             @Override
             public StoredInfo loadData(long pos) {

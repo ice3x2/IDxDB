@@ -19,6 +19,12 @@ public class IndexValueItem extends IndexValue {
     }
 
     @Override
+    public boolean equals(Object obj) {
+        if(!(obj instanceof IndexValueItem)) return false;
+        return obj == this || getIndexValue().equals(  ((IndexValueItem) obj).getIndexValue());
+    }
+
+    @Override
     void changeIndexValue(CSONItem csonItem) {
         this.csonItem = csonItem;
     }
