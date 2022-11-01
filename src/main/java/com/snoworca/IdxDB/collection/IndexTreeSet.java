@@ -59,7 +59,7 @@ public class IndexTreeSet extends IndexCollectionBase {
             }
             csonItem.storeIfNeed();
             */
-            boolean isMemCache = count > memCacheLimit;
+            boolean isMemCache = count < memCacheLimit;
             if(isMemCache) {
                 csonItem.cache();
                 cacheSet.add(csonItem);

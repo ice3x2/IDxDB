@@ -90,6 +90,7 @@ public class IdxDB {
                     CSONObject collectionOption = new CSONObject(dataBlock.getData());
                     indexCollection = restoreIndexCollection(db, id, collectionOption);
                     db.indexCollectionInfoStorePosMap.put(id, dataBlock.getPosition());
+                    db.lastCollectionID.set(id + 1);
                     continue;
                 }
                 ((Restorable) indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
