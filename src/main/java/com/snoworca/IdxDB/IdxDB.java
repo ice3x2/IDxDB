@@ -6,6 +6,7 @@ import com.snoworca.IdxDB.collection.*;
 import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.IdxDB.store.DataStoreOptions;
+import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
 import java.io.File;
@@ -197,13 +198,16 @@ public class IdxDB {
     }
 
 
+    public CSONArray executeCSONQuery(CSONArray query) {
+        return QueryExecutor.execute(this,query);
+    }
 
     public CSONObject executeCSONQuery(CSONObject query) {
         return QueryExecutor.execute(this,query);
     }
 
     public String executeQuery(String query) {
-        return QueryExecutor.execute(this,new CSONObject(query)).toString();
+        return QueryExecutor.execute(this,query);
     }
 
 

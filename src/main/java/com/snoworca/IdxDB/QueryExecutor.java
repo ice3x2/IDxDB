@@ -15,6 +15,21 @@ import java.util.List;
 public class QueryExecutor {
 
 
+    protected static String execute(IdxDB idxDB, String query) {
+        query = query.trim();
+        if(query.indexOf('[') == 0) {
+            return execute(idxDB, new CSONArray(query)).toString();
+        }
+        return execute(idxDB, new CSONObject(query)).toString();
+    }
+
+    protected static CSONArray execute(IdxDB idxDB, CSONArray csonArray) {
+        CSONArray result = new CSONArray();
+        for(int i = 0; i < csonArray.size(); i++) {
+            result.add(execute(idxDB, csonArray.getObject(i)));
+        }
+        return result;
+    }
 
     protected static CSONObject execute(IdxDB idxDB, CSONObject jsonQuery) {
         String method = jsonQuery.optString("method");
@@ -56,16 +71,16 @@ public class QueryExecutor {
 
 
     public static  CSONObject executeNewCollectionMethod(IdxDB store,String method, CSONObject argument) {
-        String name = argument.optString("name");
+        String collection = argument.optString("collection");
         CSONObject index = argument.optObject("index");
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
         if(index == null || index.isEmpty()) {
             return makeErrorCSONObject("'index' is missing from the query argument.");
         }
-        if(store.get(name) != null) {
-            return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
+        if(store.get(collection) != null) {
+            return makeErrorCSONObject("A set with the collection '" + collection + "' already exists.");
         }
         String firstIndexKey = index.keySet().iterator().next();
         int sortMethod = index.optInteger(firstIndexKey, 1);
@@ -73,13 +88,13 @@ public class QueryExecutor {
         boolean isFileStore = index.optBoolean("fileStore", true);
         boolean accessOrder = index.optBoolean("accessOrder", false);
         if("newIndexTreeSet".equalsIgnoreCase(method)) {
-            IndexSetBuilder indexSetBuilder = store. newIndexTreeSetBuilder(name);
+            IndexSetBuilder indexSetBuilder = store. newIndexTreeSetBuilder(collection);
             indexSetBuilder.index(firstIndexKey, sortMethod);
             indexSetBuilder.memCacheSize(memCacheSize);
             indexSetBuilder.setFileStore(isFileStore);
             indexSetBuilder.create();
         } else if("newIndexLinkedMap".equalsIgnoreCase(method)) {
-            IndexMapBuilder indexMapBuilder = store.newIndexMapBuilder(name);
+            IndexMapBuilder indexMapBuilder = store.newIndexMapBuilder(collection);
             indexMapBuilder.index(firstIndexKey, sortMethod);
             indexMapBuilder.memCacheSize(memCacheSize);
             indexMapBuilder.setAccessOrder(accessOrder);
@@ -89,28 +104,28 @@ public class QueryExecutor {
     }
 
     public static  CSONObject executeDropCollectionMethod(IdxDB store, CSONObject argument) {
-        String name = argument.optString("name");
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        String collection = argument.optString("collection");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
-        if(store.get(name) != null) {
-            return makeErrorCSONObject("A set with the name '" + name + "' already exists.");
+        if(store.get(collection) != null) {
+            return makeErrorCSONObject("A set with the collection '" + collection + "' already exists.");
         }
-        return new CSONObject().put("isError", false).put("success", store.dropCollection(name)).put("message", "ok");
+        return new CSONObject().put("isError", false).put("success", store.dropCollection(collection)).put("message", "ok");
     }
 
 
     public static  CSONObject executeListMethod(IdxDB store, CSONObject argument) {
-        String name = argument.optString("name");
+        String collection = argument.optString("collection");
         int limit = argument.optInteger("limit", Integer.MAX_VALUE);
         boolean revers = argument.optBoolean("revers", false);
 
         IndexCollection indexCollection = null;
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
-        if( (indexCollection = store.get(name)) == null) {
-            return makeErrorCSONObject("Collection '" + name + "' not found.");
+        if( (indexCollection = store.get(collection)) == null) {
+            return makeErrorCSONObject("Collection '" + collection + "' not found.");
         }
         List<CSONObject> jsonObjects = indexCollection.list(limit, revers);
 
@@ -119,14 +134,14 @@ public class QueryExecutor {
 
 
     public static CSONObject executeAddMethod(IdxDB store, CSONObject argument) {
-        String name = argument.optString("name");
+        String collection = argument.optString("collection");
         Object data = argument.opt("data");
         IndexCollection indexCollection = null;
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
-        if( (indexCollection = store.get(name)) == null) {
-            return makeErrorCSONObject("Collection '" + name + "' not found.");
+        if( (indexCollection = store.get(collection)) == null) {
+            return makeErrorCSONObject("Collection '" + collection + "' not found.");
         }
         if(data == null) {
             return makeErrorCSONObject("'data' is missing from the query argument.");
@@ -149,27 +164,27 @@ public class QueryExecutor {
     }
 
     public static  CSONObject executeSizeMethod(IdxDB store, CSONObject argument) {
-        String name = argument.optString("name");
+        String collection = argument.optString("collection");
         IndexCollection indexCollection = null;
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
-        if( (indexCollection = store.get(name)) == null) {
-            return makeErrorCSONObject("Collection '" + name + "' not found.");
+        if( (indexCollection = store.get(collection)) == null) {
+            return makeErrorCSONObject("Collection '" + collection + "' not found.");
         }
         int size = indexCollection.size();
         return new CSONObject().put("isError", false).put("success", true).put("message", "ok").put("data", size);
     }
 
     public static  CSONObject executeAddOrReplaceMethod(IdxDB store, CSONObject argument) {
-        String name = argument.optString("name");
+        String collection = argument.optString("collection");
         Object data = argument.opt("data");
         IndexCollection indexCollection = null;
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
-        if( (indexCollection = store.get(name)) == null) {
-            return makeErrorCSONObject("Collection '" + name + "' not found.");
+        if( (indexCollection = store.get(collection)) == null) {
+            return makeErrorCSONObject("Collection '" + collection + "' not found.");
         }
         if(data == null) {
             return makeErrorCSONObject("'data' is missing from the query argument.");
@@ -209,14 +224,14 @@ public class QueryExecutor {
 
 
     public static  CSONObject executeByIndexMethod(IdxDB store, CSONObject argument, String method) {
-        String name = argument.optString("name");
+        String collection = argument.optString("collection");
         CSONObject where = toSingleCSONObject(argument.opt("where"));
         IndexCollection indexCollection = null;
-        if(name == null || name.isEmpty()) {
-            return makeErrorCSONObject("'name' is missing from the query argument.");
+        if(collection == null || collection.isEmpty()) {
+            return makeErrorCSONObject("'collection' is missing from the query argument.");
         }
-        if((indexCollection = store.get(name)) == null) {
-            return makeErrorCSONObject("Collection '" + name + "' not found.");
+        if((indexCollection = store.get(collection)) == null) {
+            return makeErrorCSONObject("Collection '" + collection + "' not found.");
         }
         if(where == null || where.isEmpty()) {
             return makeErrorCSONObject("'where' is missing from the query argument.");
