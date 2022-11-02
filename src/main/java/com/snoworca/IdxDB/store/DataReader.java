@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class DataReader {
@@ -111,28 +112,42 @@ public class DataReader {
             returnBuffer(headerBuffer);
         } else {
             int totalReadSize = capacity + DataBlockHeader.HEADER_SIZE;
-            int arraySize = (totalReadSize / cachedBufferSize) + (totalReadSize % cachedBufferSize > 0 ? 1 : 0);
-            ByteBuffer[] byteBuffers = new ByteBuffer[arraySize];
-            byteBuffers[0] = headerBuffer;
-            for(int i = 1, n = byteBuffers.length;i < n; ++i) {
-                byteBuffers[i] = getBuffer();
+            int readSize = headerBuffer.remaining() + DataBlockHeader.HEADER_SIZE;
+            //int arraySize = (totalReadSize / cachedBufferSize) + (totalReadSize % cachedBufferSize > 0 ? 1 : 0);
+            //ByteBuffer[] byteBuffers = new ByteBuffer[arraySize];
+            //byteBuffers[0] = headerBuffer;
+            //for(int i = 1, n = byteBuffers.length;i < n; ++i) {
+             //   byteBuffers[i] = getBuffer();
+           // }
+            ArrayList<ByteBuffer> byteBuffers = new ArrayList<>();
+            byteBuffers.add(headerBuffer);
+            while(readSize < totalReadSize) {
+                ByteBuffer buffer = getBuffer();
+                int readSizeInChannel = fileChannel.read(buffer);
+                if(readSizeInChannel < 0) {
+                    returnBuffer(buffer);
+                    break;
+                } else if(readSizeInChannel == 0) {
+                    returnBuffer(buffer);
+                    continue;
+                }
+                readSize += readSizeInChannel;
+                buffer.flip();
+                byteBuffers.add(buffer);
             }
-            fileChannel.read(byteBuffers, 1, arraySize - 1);
-            for(int i = 1, n = byteBuffers.length;i < n; ++i) {
-                byteBuffers[i].flip();
-            }
-            byteBuffers[0].position(DataBlockHeader.HEADER_SIZE);
+            byteBuffers.get(0).position(DataBlockHeader.HEADER_SIZE);
+            ByteBuffer[] byteBufferArray = byteBuffers.toArray(new ByteBuffer[byteBuffers.size()]);
             if(compressionType == CompressionType.NONE) {
-                dataBlock = DataBlock.fromByteBuffers(dataBlockHeader,byteBuffers);
+                dataBlock = DataBlock.fromByteBuffers(dataBlockHeader,byteBufferArray);
                 dataBlock.setPosition(currentPos);
             } else {
                 byte[] buffer = new byte[capacity];
-                readBytes(byteBuffers, buffer);
+                readBytes(byteBufferArray, buffer);
                 byte[] decompressed = decompress(compressionType, buffer);
                 dataBlock = DataBlock.fromByteBuffer(dataBlockHeader,decompressed);
             }
-            for(int i = 0, n = byteBuffers.length;i < n; ++i) {
-                returnBuffer(byteBuffers[i]);
+            for(int i = 0, n = byteBufferArray.length;i < n; ++i) {
+                returnBuffer(byteBufferArray[i]);
             }
         }
         dataBlock.setPosition(currentPos);

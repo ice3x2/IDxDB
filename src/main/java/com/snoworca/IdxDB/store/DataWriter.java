@@ -300,7 +300,7 @@ public class DataWriter {
         try {
             byte[] buffer = block.toBytes();
             randomAccessFile.seek(this.dataLength.get());
-            writeChannel.write(ByteBuffer.wrap(buffer));
+            int writeByte = writeChannel.write(ByteBuffer.wrap(buffer));
             block.setPosition(this.dataLength.get());
             this.dataLength.addAndGet(buffer.length);
         } finally {
