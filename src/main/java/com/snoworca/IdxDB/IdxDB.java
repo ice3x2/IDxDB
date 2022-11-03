@@ -38,7 +38,7 @@ public class IdxDB {
     private final ReentrantLock collectionMutableLock = new ReentrantLock();
 
 
-    private static void setLoggerDelegator(LoggerDelegator loggerDelegator) {
+    public static void setLoggerDelegator(LoggerDelegator loggerDelegator) {
         IdxDBLogger.setLoggerDelegator(loggerDelegator);
     }
 
@@ -289,6 +289,13 @@ public class IdxDB {
     public void close() {
         dataStore.close();
         dataStore = null;
+        indexCollectionIDMap.clear();
+        indexCollectionMap.clear();
+        indexCollectionInfoStorePosMap.clear();
+        if(IdxDBLogger.isInfo()) {
+            IdxDBLogger.info("IdxDB.close()");
+        }
+
     }
 
 
@@ -307,9 +314,15 @@ public class IdxDB {
                 try {
                     DataBlock dataBlock =dataStore.write(indexCollection.getID(), buffer);
                     indexCollectionInfoStorePosMap.put(indexCollection.getID(),dataBlock.getPosition());
+                    if(IdxDBLogger.isInfo()) {
+                        IdxDBLogger.info("IdxDB.createCollection() - " + name + " create complete. - " + optionInfo.toString());
+                    }
                 } catch (IOException e) {
+                    IdxDBLogger.error( "Collection create fail - " + optionInfo.toString(), e);
                     throw new RuntimeException(e);
                 }
+
+
             }
         };
     };

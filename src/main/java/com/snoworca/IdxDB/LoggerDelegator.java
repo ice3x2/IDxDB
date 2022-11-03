@@ -5,16 +5,26 @@ public interface LoggerDelegator {
         public void error(String message);
         public void error(String message, Throwable t);
         public void debug(String message);
-        public void fatal(String message);
-        public void fatal(String message, Throwable t);
+        public default void fatal(String message) {
+                error(message);
+        }
+        public default  void fatal(String message, Throwable t) {
+                error(message,t);
+        }
 
         public void debug(String message, Throwable t);
         public void warn(String message);
         public void warn(String message, Throwable t);
 
-        public boolean isDebug();
-        public boolean isInfo();
-        public boolean isWarn();
+        public default boolean isDebug() {
+                return true;
+        }
+        public default boolean isInfo() {
+                return true;
+        }
+        public default boolean isWarn() {
+                return true;
+        }
 
 
 }

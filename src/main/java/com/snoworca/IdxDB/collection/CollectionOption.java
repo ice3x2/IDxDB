@@ -12,6 +12,11 @@ public class CollectionOption {
     public CollectionOption(String className, String collectionName) {
         option.put("className", className);
         option.put("name", collectionName);
+        option.put("sort", 1);
+        option.put("capacityRatio", 0.3f);
+        option.put("memCacheIndex", true);
+        option.put("memCacheSize", 500);
+
     }
 
 

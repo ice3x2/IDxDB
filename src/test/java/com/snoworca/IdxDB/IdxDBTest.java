@@ -6,6 +6,7 @@ import com.snoworca.IdxDB.collection.IndexLinkedMap;
 import com.snoworca.IdxDB.collection.IndexTreeSet;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -16,6 +17,53 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class IdxDBTest {
 
+
+    @BeforeAll
+    public static void setLogger() {
+        IdxDB.setLoggerDelegator(new LoggerDelegator() {
+
+            @Override
+            public void info(String message) {
+                System.out.println("[INFO] " + message);
+            }
+
+            @Override
+            public void error(String message) {
+                System.out.println("[ERROR] " + message);
+            }
+
+            @Override
+            public void error(String message, Throwable t) {
+                System.out.println("[ERROR] " + message);
+                t.printStackTrace();
+            }
+
+            @Override
+            public void debug(String message) {
+                System.out.println("[DEBUG]" + message);
+            }
+
+
+            @Override
+            public void debug(String message, Throwable t) {
+                System.out.println("[DEBUG] " + message);
+                t.printStackTrace();;
+            }
+
+            @Override
+            public void warn(String message) {
+                System.out.println("[WARN] " + message);
+
+            }
+
+            @Override
+            public void warn(String message, Throwable t) {
+                System.out.println("[WARN] " + message);
+                t.printStackTrace();
+            }
+
+        });
+    }
 
     @Test
     public void restoreOnThreadTest() throws IOException {
