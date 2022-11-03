@@ -12,8 +12,6 @@ import com.snoworca.cson.CSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -23,18 +21,22 @@ public class IdxDB {
     private static final int DB_INFO_ID = 0;
     private static final int START_ID = 10000;
 
-    private AtomicInteger lastCollectionID = new AtomicInteger(START_ID);
+    private final AtomicInteger lastCollectionID = new AtomicInteger(START_ID);
 
     private DataStore dataStore;
 
     private final static String META_INFO_TYPE_ENTRY = "entry";
 
 
-    private ConcurrentHashMap<String, IndexCollection> indexCollectionMap = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, IndexCollection> indexCollectionIDMap = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
-    private ReentrantLock collectionMutableLock = new ReentrantLock();
+    private final ConcurrentHashMap<String, IndexCollection> indexCollectionMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, IndexCollection> indexCollectionIDMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
+    private final ReentrantLock collectionMutableLock = new ReentrantLock();
 
+
+    private static void setLoggerDelegator(LoggerDelegator loggerDelegator) {
+        IdxDBLogger.setLoggerDelegator(loggerDelegator);
+    }
 
     public static IdxDBMaker newMaker(File file) {
         return new IdxDBMaker(file);
@@ -42,34 +44,57 @@ public class IdxDB {
 
     public static class  IdxDBMaker {
         private File dbFile;
-        private int dataReaderCapacity = 3;
+
+        private DataStoreOptions dataStoreOptions = new DataStoreOptions();
         private final static long version = 1;
 
-        private CompressionType compressionType = CompressionType.NONE;
 
         public IdxDBMaker(File file) {
             this.dbFile = file;
         }
 
-        public IdxDBMaker dataReaderCapacity(int capacity) {
-            if(capacity < 1) capacity = 1;
-            dataReaderCapacity = capacity;
+        public IdxDBMaker dataReaderSize(int size) {
+            if(size < 1) size = 1;
+            dataStoreOptions.setReaderSize(size);
             return this;
         }
 
-        public IdxDBMaker compressionType(CompressionType compressionType) {
-            this.compressionType = compressionType;
+        public IdxDBMaker setDataStoreIterableBufferSize(int size) {
+            if(size < 1024 * 1024 * 32) size = 1024 * 1024 * 32;
+            dataStoreOptions.setIterableBufferSize(size);
             return this;
+        }
+
+        public IdxDBMaker setDataCapacityRatio(float capacityRatio) {
+            dataStoreOptions.setCapacityRatio(capacityRatio);
+            return this;
+        }
+
+
+        public IdxDBMaker compressionType(CompressionType compressionType) {
+            this.dataStoreOptions.setCompressionType(compressionType);
+            return this;
+        }
+
+        @Override
+        public String toString() {
+            return new CSONObject()
+                    .put("dbFile", dbFile.getAbsolutePath())
+                    .put("version", version)
+                    .put("dataStoreOptions", new CSONObject(dataStoreOptions.toString()))
+                    .toString();
         }
 
         public IdxDB make() throws IOException {
             IdxDB idxDB = new IdxDB();
             DataStoreOptions dataStoreOption = new DataStoreOptions();
-            dataStoreOption.setReaderSize(dataReaderCapacity);
-            dataStoreOption.setCompressionType(compressionType);
             boolean existDBFile = dbFile.isFile() && dbFile.length() > 0;
+            if(IdxDBLogger.isInfo()) {
+                IdxDBLogger.info("IdxDBMaker.make() - " + this.toString());
+            }
             idxDB.dataStore = new DataStore(dbFile, dataStoreOption);
             idxDB.dataStore.open();
+
             if(existDBFile) {
                 loadDB(idxDB);
             } else {

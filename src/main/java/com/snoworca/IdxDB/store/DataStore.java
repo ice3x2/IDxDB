@@ -44,6 +44,9 @@ public class DataStore implements Iterable<DataBlock> {
         dataWriter = new DataWriter(file, capacityRatio, compressionType, emptyBlockPositionPool);
         this.config = config;
         availableReaders.set(this.config.getReaderSize());
+
+
+
     }
 
 
