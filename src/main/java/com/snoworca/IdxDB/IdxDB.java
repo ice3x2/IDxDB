@@ -11,8 +11,12 @@ import com.snoworca.cson.CSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -44,6 +48,9 @@ public class IdxDB {
 
     public static class  IdxDBMaker {
         private File dbFile;
+        private boolean isRestoreOnMultiThead = false;
+        private int restoreTheadPoolSize = Runtime.getRuntime().availableProcessors();
+
 
         private DataStoreOptions dataStoreOptions = new DataStoreOptions();
         private final static long version = 1;
@@ -52,6 +59,18 @@ public class IdxDB {
         public IdxDBMaker(File file) {
             this.dbFile = file;
         }
+
+        public IdxDBMaker setRestoreOnMultiThead(boolean restoreOnMultiThead) {
+             isRestoreOnMultiThead = restoreOnMultiThead;
+             return this;
+        }
+
+        public IdxDBMaker setRestoreTheadPoolSize(int restoreTheadPoolSize) {
+            this.restoreTheadPoolSize = restoreTheadPoolSize;
+            return this;
+        }
+
+
 
         public IdxDBMaker dataReaderSize(int size) {
             if(size < 1) size = 1;
@@ -81,6 +100,8 @@ public class IdxDB {
             return new CSONObject()
                     .put("dbFile", dbFile.getAbsolutePath())
                     .put("version", version)
+                    .put("isRestoreOnMultiThead", isRestoreOnMultiThead)
+                    .put("restoreTheadPoolSize", restoreTheadPoolSize)
                     .put("dataStoreOptions", new CSONObject(dataStoreOptions.toString()))
                     .toString();
         }
@@ -100,10 +121,38 @@ public class IdxDB {
             } else {
                 initDB(idxDB);
             }
+
+            if(IdxDBLogger.isInfo()) {
+                IdxDBLogger.info("IdxDB created.");
+            }
             return idxDB;
         }
 
+        private void waitForExecutorService(ExecutorService executorService) {
+            if(executorService == null || executorService.isTerminated()) return;
+            executorService.shutdown();
+            try {
+                executorService.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                IdxDBLogger.error(e.getMessage(), e);
+                throw new RuntimeException(e);
+            }
+        }
+
         private void loadDB(IdxDB db) throws IOException {
+            if(IdxDBLogger.isInfo()) {
+                IdxDBLogger.info("IdxDBMaker.loadDB() - start");
+            }
+            ExecutorService executorService = null;
+
+
+            if(isRestoreOnMultiThead) {
+                restoreTheadPoolSize = restoreTheadPoolSize < 1 ? Runtime.getRuntime().availableProcessors() : restoreTheadPoolSize;
+                restoreTheadPoolSize = Math.max(restoreTheadPoolSize, 1);
+                executorService = Executors.newFixedThreadPool(restoreTheadPoolSize);
+            }
+
+
              for(DataBlock dataBlock : db.dataStore) {
                  int id = dataBlock.getCollectionId();
                  if(id == DB_INFO_ID) {
@@ -117,15 +166,61 @@ public class IdxDB {
                     indexCollection = restoreIndexCollection(db, id, collectionOption);
                     db.indexCollectionInfoStorePosMap.put(id, dataBlock.getPosition());
                     db.lastCollectionID.set(id + 1);
+                    if(IdxDBLogger.isInfo()) {
+                        IdxDBLogger.info("restoreIndexCollection() - " + collectionOption.toString());
+                    }
                     continue;
                 }
-                ((Restorable) indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
 
+                if(isRestoreOnMultiThead) {
+                    IndexCollection finalIndexCollection = indexCollection;
+                    final long position = dataBlock.getPosition();
+                    final int capacity = dataBlock.getCapacity();
+                    final byte[] data = dataBlock.getData();
+                    executorService.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            ((Restorable) finalIndexCollection).restore(new StoredInfo(position, capacity, new CSONObject(data)));
+                        }
+                    });
+                } else {
+                    ((Restorable) indexCollection).restore(new StoredInfo(dataBlock.getPosition(), dataBlock.getCapacity(), new CSONObject(dataBlock.getData())));
+                }
              }
-             Collection<IndexCollection> indexCollections =  db.indexCollectionMap.values();
+            Collection<IndexCollection> indexCollections =  db.indexCollectionMap.values();
+            int collectionSizes = indexCollections.size();
+
+            //waitForExecutorService(executorService);
+
+            if(IdxDBLogger.isInfo()) {
+                IdxDBLogger.info("restoreIndexCollection() - restore complete. collection size: " + collectionSizes);
+            }
+
+            if(isRestoreOnMultiThead) {
+                executorService = Executors.newFixedThreadPool(restoreTheadPoolSize);
+            }
+
              for(IndexCollection indexCollection : indexCollections) {
-                 ((Restorable)indexCollection).end();
+                 if(!isRestoreOnMultiThead) {
+
+                     ((Restorable) indexCollection).end();
+                 } else {
+                     executorService.execute(new Runnable() {
+                         @Override
+                         public void run() {
+                             ((Restorable) indexCollection).end();
+                         }
+                     });
+                 }
              }
+
+
+            waitForExecutorService(executorService);
+
+            if(IdxDBLogger.isInfo()) {
+                IdxDBLogger.info("IdxDBMaker.loadDB() - end");
+            }
+
         }
 
         private IndexCollection restoreIndexCollection(IdxDB db,int id, CSONObject collectionOption) {
@@ -156,6 +251,13 @@ public class IdxDB {
 
     }
 
+    public int collectionSize() {
+        return indexCollectionMap.size();
+    }
+
+    public Collection<String> collectionNames() {
+        return new ArrayList<String>(indexCollectionMap.keySet());
+    }
 
     public boolean dropCollection(String collectionName) {
         IndexCollection indexCollection = indexCollectionMap.remove(collectionName);

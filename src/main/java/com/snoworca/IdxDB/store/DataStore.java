@@ -1,6 +1,7 @@
 package com.snoworca.IdxDB.store;
 
 import com.snoworca.IdxDB.CompressionType;
+import com.snoworca.IdxDB.IdxDBLogger;
 import com.snoworca.IdxDB.exception.AccessOutOfRangePositionDataException;
 
 import java.io.File;
@@ -44,7 +45,9 @@ public class DataStore implements Iterable<DataBlock> {
         dataWriter = new DataWriter(file, capacityRatio, compressionType, emptyBlockPositionPool);
         this.config = config;
         availableReaders.set(this.config.getReaderSize());
-
+        if(IdxDBLogger.isDebug())  {
+            IdxDBLogger.debug("DataStore init with reader size: " + availableReaders.get());
+        }
 
 
     }

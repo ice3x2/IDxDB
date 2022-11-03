@@ -1,6 +1,6 @@
 package com.snoworca.IdxDB;
 
-class IdxDBLogger {
+public class IdxDBLogger {
 
     private static LoggerDelegator loggerDelegator = null;
 

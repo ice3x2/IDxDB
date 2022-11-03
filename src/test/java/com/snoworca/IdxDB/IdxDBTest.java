@@ -18,6 +18,44 @@ class IdxDBTest {
 
 
     @Test
+    public void restoreOnThreadTest() throws IOException {
+        File file = new File("test.db");
+        file.delete();
+        IdxDB idxDB = IdxDB.newMaker(file).setRestoreOnMultiThead(true).make();
+        for(int i = 0; i < 500; ++i) {
+            IndexCollection indexCollection = idxDB.newIndexTreeSetBuilder("test" + i).index("idx",1).create();
+            ArrayList<Integer> list = new ArrayList<>();
+            for(int j = 0; j < 1000; ++j) {
+                list.add(j);
+            }
+            Collections.shuffle(list);
+            for(int j = 0; j < 1000; ++j) {
+                indexCollection.add(new CSONObject().put("idx", list.get(j)));
+            }
+            indexCollection.commit();
+        }
+        idxDB.close();
+        long start = System.currentTimeMillis();
+        idxDB = IdxDB.newMaker(file).setRestoreOnMultiThead(false).make();
+        //assertEquals(1000, idxDB.collectionSize());
+        long labTimeSync = System.currentTimeMillis() - start;
+        idxDB.close();
+        start = System.currentTimeMillis();
+        idxDB = IdxDB.newMaker(file).setRestoreOnMultiThead(true).make();
+        //assertEquals(2600, idxDB.collectionSize());
+        long labTimeAsync = System.currentTimeMillis() - start;
+        idxDB.close();
+        System.out.println("Sync: " + labTimeSync + "ms");
+        System.out.println("Async: " + labTimeAsync + "ms");
+        assertTrue(labTimeAsync < labTimeSync);
+
+        file.delete();
+
+
+
+    }
+
+    @Test
     public void memCacheTest() throws IOException {
         File file = new File("memCache.db");
         file.delete();
