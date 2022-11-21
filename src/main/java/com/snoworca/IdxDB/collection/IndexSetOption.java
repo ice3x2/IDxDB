@@ -6,6 +6,7 @@ public class IndexSetOption extends CollectionOption {
 
     public IndexSetOption(String collectionName) {
         super(IndexTreeSet.class.getName(), collectionName);
+        toCsonObject().put("fileStore", true);
     }
     public void setFileStore(boolean fileStoreEnable) {
         toCsonObject().put("fileStore", fileStoreEnable);

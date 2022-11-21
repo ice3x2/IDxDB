@@ -57,6 +57,10 @@ public class DataStore implements Iterable<DataBlock> {
 
 
     public void open() throws IOException {
+        File parentDir = this.file.getAbsoluteFile().getParentFile();
+        if(!parentDir.isDirectory()) {
+            parentDir.mkdirs();
+        }
         if(!this.file.exists()) {
             this.file.createNewFile();
         }

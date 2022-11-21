@@ -288,6 +288,13 @@ public class IdxDB {
     public void close() {
         dataStore.close();
         dataStore = null;
+        indexCollectionIDMap.clear();
+        indexCollectionMap.clear();
+        indexCollectionInfoStorePosMap.clear();
+        if(LOG.isInfoEnabled()) {
+            LOG.info("IdxDB.close()");
+        }
+
     }
 
 
@@ -306,9 +313,15 @@ public class IdxDB {
                 try {
                     DataBlock dataBlock =dataStore.write(indexCollection.getID(), buffer);
                     indexCollectionInfoStorePosMap.put(indexCollection.getID(),dataBlock.getPosition());
+                    if(LOG.isInfoEnabled()) {
+                        LOG.info("IdxDB.createCollection() - '{}' create complete. - {}", name,  optionInfo.toString());
+                    }
                 } catch (IOException e) {
+                    LOG.error( "Collection create fail - " + optionInfo.toString(), e);
                     throw new RuntimeException(e);
                 }
+
+
             }
         };
     };
