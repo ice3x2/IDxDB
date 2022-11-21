@@ -8,6 +8,8 @@ import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.IdxDB.store.DataStoreOptions;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class IdxDB {
+
+    private final static Logger LOG = LoggerFactory.getLogger(IdxDB.class);
 
     private static final int DB_INFO_ID = 0;
     private static final int START_ID = 10000;
@@ -37,10 +41,6 @@ public class IdxDB {
     private final ConcurrentHashMap<Integer, Long> indexCollectionInfoStorePosMap = new ConcurrentHashMap<>();
     private final ReentrantLock collectionMutableLock = new ReentrantLock();
 
-
-    private static void setLoggerDelegator(LoggerDelegator loggerDelegator) {
-        IdxDBLogger.setLoggerDelegator(loggerDelegator);
-    }
 
     public static IdxDBMaker newMaker(File file) {
         return new IdxDBMaker(file);
@@ -110,8 +110,8 @@ public class IdxDB {
             IdxDB idxDB = new IdxDB();
             DataStoreOptions dataStoreOption = new DataStoreOptions();
             boolean existDBFile = dbFile.isFile() && dbFile.length() > 0;
-            if(IdxDBLogger.isInfo()) {
-                IdxDBLogger.info("IdxDBMaker.make() - " + this.toString());
+            if(LOG.isInfoEnabled()) {
+                LOG.info("IdxDBMaker.make() - {}" , this.toString());
             }
             idxDB.dataStore = new DataStore(dbFile, dataStoreOption);
             idxDB.dataStore.open();
@@ -122,8 +122,8 @@ public class IdxDB {
                 initDB(idxDB);
             }
 
-            if(IdxDBLogger.isInfo()) {
-                IdxDBLogger.info("IdxDB created.");
+            if(LOG.isInfoEnabled()) {
+                LOG.info("IdxDB created.");
             }
             return idxDB;
         }
@@ -134,14 +134,14 @@ public class IdxDB {
             try {
                 executorService.awaitTermination(365, TimeUnit.DAYS);
             } catch (InterruptedException e) {
-                IdxDBLogger.error(e.getMessage(), e);
+                LOG.error(e.getMessage(), e);
                 throw new RuntimeException(e);
             }
         }
 
         private void loadDB(IdxDB db) throws IOException {
-            if(IdxDBLogger.isInfo()) {
-                IdxDBLogger.info("IdxDBMaker.loadDB() - start");
+            if(LOG.isInfoEnabled()) {
+                LOG.info("IdxDBMaker.loadDB() - start");
             }
             ExecutorService executorService = null;
 
@@ -152,7 +152,7 @@ public class IdxDB {
                 executorService = Executors.newFixedThreadPool(restoreTheadPoolSize);
             }
 
-
+            int restoreCount = 0;
              for(DataBlock dataBlock : db.dataStore) {
                  int id = dataBlock.getCollectionId();
                  if(id == DB_INFO_ID) {
@@ -166,8 +166,9 @@ public class IdxDB {
                     indexCollection = restoreIndexCollection(db, id, collectionOption);
                     db.indexCollectionInfoStorePosMap.put(id, dataBlock.getPosition());
                     db.lastCollectionID.set(id + 1);
-                    if(IdxDBLogger.isInfo()) {
-                        IdxDBLogger.info("restoreIndexCollection() - " + collectionOption.toString());
+                    ++restoreCount;
+                    if(LOG.isInfoEnabled()) {
+                        LOG.info("restoreIndexCollection() - {}  (count: {})", collectionOption.toString(), restoreCount);
                     }
                     continue;
                 }
@@ -190,10 +191,8 @@ public class IdxDB {
             Collection<IndexCollection> indexCollections =  db.indexCollectionMap.values();
             int collectionSizes = indexCollections.size();
 
-            //waitForExecutorService(executorService);
-
-            if(IdxDBLogger.isInfo()) {
-                IdxDBLogger.info("restoreIndexCollection() - restore complete. collection size: " + collectionSizes);
+            if(LOG.isInfoEnabled()) {
+                LOG.info("restoreIndexCollection() - restore complete. (collection size: {})", collectionSizes);
             }
 
             if(isRestoreOnMultiThead) {
@@ -217,8 +216,8 @@ public class IdxDB {
 
             waitForExecutorService(executorService);
 
-            if(IdxDBLogger.isInfo()) {
-                IdxDBLogger.info("IdxDBMaker.loadDB() - end");
+            if(LOG.isInfoEnabled()) {
+                LOG.info("IdxDBMaker.loadDB() - end");
             }
 
         }

@@ -1,6 +1,7 @@
 package com.snoworca.IdxDB.store;
 
-import com.snoworca.IdxDB.IdxDBLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -9,6 +10,8 @@ import java.util.Iterator;
 import java.util.concurrent.locks.ReentrantLock;
 
 class DataStoreIterator implements Iterator<DataBlock> {
+
+    private static Logger LOG = LoggerFactory.getLogger(DataStoreIterator.class);
 
     private final File file;
     private RandomAccessFile randomAccessFile;
@@ -38,8 +41,8 @@ class DataStoreIterator implements Iterator<DataBlock> {
     }
 
     private void open() throws IOException {
-        if(IdxDBLogger.isDebug()) {
-            IdxDBLogger.debug("DataStoreIterator.open");
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("DataStoreIterator.open");
         }
         lock.lock();
         try {
@@ -62,8 +65,8 @@ class DataStoreIterator implements Iterator<DataBlock> {
             randomAccessFile.seek(currentPosition);
             int readSize = fileChannel.read(byteBuffer);
             nextPosition = currentPosition + readSize;
-            if(IdxDBLogger.isDebug()) {
-                IdxDBLogger.debug("DataStoreIterator.nextBufferRead : " + currentPosition + " ~ " + nextPosition + "(" + (int)(((float)nextPosition / fileLength) * 100)  + "%)");
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("DataStoreIterator.nextBufferRead : " + currentPosition + " ~ " + nextPosition + "(" + (int)(((float)nextPosition / fileLength) * 100)  + "%)");
             }
             byteBuffer.flip();
         } finally {
