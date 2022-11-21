@@ -1,5 +1,8 @@
 package com.snoworca.IdxDB.store;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -7,6 +10,8 @@ import java.util.Iterator;
 import java.util.concurrent.locks.ReentrantLock;
 
 class DataStoreIterator implements Iterator<DataBlock> {
+
+    private static Logger LOG = LoggerFactory.getLogger(DataStoreIterator.class);
 
     private final File file;
     private RandomAccessFile randomAccessFile;
@@ -21,6 +26,7 @@ class DataStoreIterator implements Iterator<DataBlock> {
 
     private boolean isEnd = false;
     private boolean isInit = false;
+    private final long fileLength;
 
     private final ReentrantLock lock;
     private final EmptyBlockPositionPool emptyBlockPositionPool;
@@ -29,11 +35,15 @@ class DataStoreIterator implements Iterator<DataBlock> {
     DataStoreIterator(File file, int bufferSize,EmptyBlockPositionPool emptyBlockPositionPool, ReentrantLock lock) {
         this.file = file;
         this.bufferSize = bufferSize;
+        this.fileLength = file.length();
         this.lock = lock;
         this.emptyBlockPositionPool = emptyBlockPositionPool;
     }
 
     private void open() throws IOException {
+        if(LOG.isDebugEnabled()) {
+            LOG.debug("DataStoreIterator.open");
+        }
         lock.lock();
         try {
             randomAccessFile = new RandomAccessFile(file, "r");
@@ -53,8 +63,11 @@ class DataStoreIterator implements Iterator<DataBlock> {
         try {
             byteBuffer.clear();
             randomAccessFile.seek(currentPosition);
-            fileChannel.read(byteBuffer);
-            nextPosition = currentPosition + bufferSize;
+            int readSize = fileChannel.read(byteBuffer);
+            nextPosition = currentPosition + readSize;
+            if(LOG.isDebugEnabled()) {
+                LOG.debug("DataStoreIterator.nextBufferRead : " + currentPosition + " ~ " + nextPosition + "(" + (int)(((float)nextPosition / fileLength) * 100)  + "%)");
+            }
             byteBuffer.flip();
         } finally {
             lock.unlock();

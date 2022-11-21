@@ -2,6 +2,8 @@ package com.snoworca.IdxDB.store;
 
 import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.exception.AccessOutOfRangePositionDataException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,6 +12,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class DataStore implements Iterable<DataBlock> {
+
+    private static Logger LOG = LoggerFactory.getLogger(DataStore.class);
 
     private final File file;
     private final LinkedList<DataReader> dataReaderDeque = new LinkedList<>();
@@ -44,6 +48,11 @@ public class DataStore implements Iterable<DataBlock> {
         dataWriter = new DataWriter(file, capacityRatio, compressionType, emptyBlockPositionPool);
         this.config = config;
         availableReaders.set(this.config.getReaderSize());
+        if(LOG.isDebugEnabled())  {
+            LOG.debug("DataStore init with reader size: {}", availableReaders.get());
+        }
+
+
     }
 
 

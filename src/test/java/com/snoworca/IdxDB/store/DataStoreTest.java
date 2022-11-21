@@ -83,8 +83,8 @@ class DataStoreTest {
         file.delete();
         DataStore dataStore = new DataStore(file);
         dataStore.open();
-        dataStore.write(1, getRandomString(10000).getBytes());
-        byte[] buffer = getRandomString(10000).getBytes();
+        dataStore.write(1, getRandomString(1000000).getBytes());
+        byte[] buffer = getRandomString(1000000).getBytes();
         long pos = dataStore.write(1, buffer).getPosition();
         DataBlock readBuffer = dataStore.get(pos);
         byte[] readData = readBuffer.getData();

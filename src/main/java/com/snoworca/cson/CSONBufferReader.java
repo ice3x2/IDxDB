@@ -1,9 +1,6 @@
 package com.snoworca.cson;
 
-import com.sun.org.apache.bcel.internal.generic.CASTORE;
-
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;

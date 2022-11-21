@@ -1,6 +1,7 @@
 package com.snoworca.IdxDB.store;
 
 import com.snoworca.IdxDB.CompressionType;
+import com.snoworca.cson.CSONObject;
 
 public class DataStoreOptions {
     private int readerSize = 3;
@@ -49,5 +50,14 @@ public class DataStoreOptions {
 
     public int getReaderSize() {
         return readerSize;
+    }
+
+    @Override
+    public String toString() {
+        return new CSONObject().put("readerSize", readerSize)
+                .put("compressionType", compressionType.getValue())
+                .put("capacityRatio", capacityRatio)
+                .put("iterableBufferSize", iterableBufferSize)
+                .toString();
     }
 }

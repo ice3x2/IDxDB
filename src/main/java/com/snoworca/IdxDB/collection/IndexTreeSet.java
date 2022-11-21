@@ -46,28 +46,23 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     @Override
     protected void onMemStore() {
-        int count = 0;
-        int memCacheLimit = getMemCacheSize();
-        for (CSONItem csonItem : itemSet) {
-            /*if (csonItem.getStoragePos() > 0 && csonItem.isChanged()) {
-                try {
-                    unlink(csonItem);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+        writeLock();
+        try {
+            int count = 0;
+            int memCacheLimit = getMemCacheSize();
+            for (CSONItem csonItem : itemSet) {
+                boolean isMemCache = count < memCacheLimit;
+                if (isMemCache) {
+                    csonItem.cache();
+                    cacheSet.add(csonItem);
+                } else {
+                    csonItem.clearCache();
                 }
-                csonItem.setStoragePos(-1);
-            }
-            csonItem.storeIfNeed();
-            */
-            boolean isMemCache = count > memCacheLimit;
-            if(isMemCache) {
-                csonItem.cache();
-                cacheSet.add(csonItem);
-            } else {
-                csonItem.clearCache();
-            }
 
-            ++count;
+                ++count;
+            }
+        } finally {
+            writeUnlock();
         }
     }
 
@@ -501,12 +496,18 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     @Override
     public void restore(StoredInfo info) {
-        CSONObject csonObject = info.getCsonObject();
-        String indexKey = getIndexKey();
-        CSONItem csonItem = new CSONItem(getStoreDelegator(), csonObject.optString(indexKey),indexKey, getSort(), isMemCacheIndex);
-        csonItem.setStoreCapacity(info.getCapacity());
-        csonItem.setStoragePos_(info.getPosition());
-        itemSet.add(csonItem);
+        writeLock();
+        try {
+            CSONObject csonObject = info.getCsonObject();
+            String indexKey = getIndexKey();
+            CSONItem csonItem = new CSONItem(getStoreDelegator(), csonObject.optString(indexKey),indexKey, getSort(), isMemCacheIndex);
+            csonItem.setStoreCapacity(info.getCapacity());
+            csonItem.setStoragePos_(info.getPosition());
+            itemSet.add(csonItem);
+        } finally {
+            writeUnlock();
+        }
+
     }
 
     @Override
