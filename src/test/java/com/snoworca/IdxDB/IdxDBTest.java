@@ -6,6 +6,7 @@ import com.snoworca.IdxDB.collection.IndexLinkedMap;
 import com.snoworca.IdxDB.collection.IndexTreeSet;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;

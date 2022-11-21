@@ -6,6 +6,7 @@ public class IndexMapOption extends CollectionOption {
 
     public IndexMapOption(String collectionName) {
         super(IndexLinkedMap.class.getName(), collectionName);
+        toCsonObject().put("accessOrder", false);
     }
 
     public static IndexMapOption fromCSONObject(CSONObject csonObject) {

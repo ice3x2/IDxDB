@@ -5,7 +5,7 @@ import com.snoworca.cson.CSONObject;
 
 public class DataStoreOptions {
     private int readerSize = 3;
-    private CompressionType compressionType;
+    private CompressionType compressionType = CompressionType.NONE;
     private float capacityRatio = 0.3f;
 
     private int iterableBufferSize = 1024 * 1024 * 32;
