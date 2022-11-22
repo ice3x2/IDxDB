@@ -199,15 +199,19 @@ public class IdxDB {
                 executorService = Executors.newFixedThreadPool(restoreTheadPoolSize);
             }
 
+            AtomicInteger indexCollectionCount = new AtomicInteger(0);
              for(IndexCollection indexCollection : indexCollections) {
                  if(!isRestoreOnMultiThead) {
-
                      ((Restorable) indexCollection).end();
+                     indexCollectionCount.incrementAndGet();
+                     LOG.info("restoreIndexCollection() - indexing complete. (collection size: {})", indexCollectionCount.get());
                  } else {
                      executorService.execute(new Runnable() {
                          @Override
                          public void run() {
                              ((Restorable) indexCollection).end();
+                             indexCollectionCount.incrementAndGet();
+                             LOG.info("restoreIndexCollection() - indexing complete. (collection size: {})", indexCollectionCount.get());
                          }
                      });
                  }

@@ -13,29 +13,26 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public abstract class IndexCollectionBase implements IndexCollection, Restorable {
 
-    private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-    private ReentrantReadWriteLock readWriteTransactionTempLock = new ReentrantReadWriteLock();
-    private ArrayList<TransactionOrder> transactionOrders = new ArrayList<>();
+    private final ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    private final ReentrantReadWriteLock readWriteTransactionTempLock = new ReentrantReadWriteLock();
+    private final ArrayList<TransactionOrder> transactionOrders = new ArrayList<>();
 
-    private int collectionID;
-    private final int memCacheLimit;
-    private DataStore dataStore;
-    private String name;
+    private final int collectionID;
+    private final DataStore dataStore;
+    private DataStore dataStoreOfIndexCache;
+    private final String name;
     private LinkedHashSet<String> indexKeySet;
-    private int memCacheSize;
-    private long lastStorePos = -1;
+    private final int memCacheSize;
+
     private StoreDelegator storeDelegator;
 
-    private String indexKey;
-    private int sort;
+    private final String indexKey;
+    private final int sort;
     private long headPos = -1;
 
     private boolean isMemCacheIndex = true;
 
-    private float capacityRatio = 0.3f;
-    private boolean isCapacityFixed = false;
-
-    private CollectionOption collectionOption;
+    private final CollectionOption collectionOption;
 
     private CompressionType compressionType;
 
@@ -46,16 +43,14 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
         this.memCacheSize = collectionOption.getMemCacheSize();
         this.indexKey = collectionOption.getIndexKey();
         this.sort = collectionOption.getIndexSort();
-        this.memCacheLimit = collectionOption.getMemCacheSize();
         this.headPos = collectionOption.getHeadPos();
         this.isMemCacheIndex = collectionOption.isMemCacheIndex();
-        this.capacityRatio = collectionOption.getCapacityRatio();
-        this.isCapacityFixed = capacityRatio < 0.001f;
+        float capacityRatio = collectionOption.getCapacityRatio();
+        boolean isCapacityFixed = capacityRatio < 0.001f;
         onInit(collectionOption);
         if (this.dataStore != null) {
             makeStoreDelegatorImpl();
         }
-        initData();
 
         this.collectionOption = collectionOption;
     }
@@ -158,34 +153,6 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
         return new CSONObject(collectionOption.toCsonObject().toBytes());
     }
 
-    private void initData() {
-        /*try {
-            if(headPos < 1) {
-                DataBlock headBlock = dataStore.write(new CSONObject().toByteArray());
-                lastStorePos = headPos = headBlock.getPos();
-            } else {
-                Iterator<DataBlock> dataBlockIterator = dataStore.iterator(headPos);
-                boolean header = true;
-                while(dataBlockIterator.hasNext()) {
-                    DataBlock dataBlock = dataBlockIterator.next();
-                    if(header) {
-                        header = false;
-                        continue;
-                    }
-                    byte[] buffer = dataBlock.getPayload();
-                    lastStorePos = dataBlock.getPos();
-                    Object indexValue = indexFromBuffer(buffer).get(0);
-                    CSONItem csonItem = new CSONItem(storeDelegator, indexKey,indexValue, sort, isMemCacheIndex);
-                    csonItem.setStoragePos_(lastStorePos);
-                    csonItem.setStore(true);
-                    onRestoreCSONItem(csonItem);
-                }
-                onMemStore();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }*/
-    }
 
 
     protected boolean unlink(CSONItem item) throws IOException {

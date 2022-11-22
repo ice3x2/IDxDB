@@ -2,7 +2,6 @@ package com.snoworca.IdxDB.collection;
 
 import com.snoworca.IdxDB.CompareUtil;
 import com.snoworca.IdxDB.OP;
-import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.cson.CSONObject;
 
@@ -40,6 +39,7 @@ public class IndexTreeSet extends IndexCollectionBase {
 
     @Override
     protected void onRestoreCSONItem(CSONItem csonItem) {
+        csonItem.clearCache();
         itemSet.add(csonItem);
     }
 
@@ -50,6 +50,7 @@ public class IndexTreeSet extends IndexCollectionBase {
         try {
             int count = 0;
             int memCacheLimit = getMemCacheSize();
+            memCacheLimit = 320;
             for (CSONItem csonItem : itemSet) {
                 boolean isMemCache = count < memCacheLimit;
                 if (isMemCache) {
@@ -58,7 +59,6 @@ public class IndexTreeSet extends IndexCollectionBase {
                 } else {
                     csonItem.clearCache();
                 }
-
                 ++count;
             }
         } finally {
