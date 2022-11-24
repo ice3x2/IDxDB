@@ -32,23 +32,31 @@ public class IndexStoreWriter {
     public static final byte CMD_PUT = 1;
     public static final byte CMD_REMOVE = 2;
 
+    public static final byte CMD_MODIFY = 3;
+
     public IndexStoreWriter(File indexStoreFile) throws IOException {
         this.indexStoreFile = indexStoreFile;
+        if(!indexStoreFile.getParentFile().exists()) {
+            indexStoreFile.getParentFile().mkdirs();
+        }
+        if(!indexStoreFile.exists()) {
+            indexStoreFile.createNewFile();
+        }
         outputStream = Files.newOutputStream(indexStoreFile.toPath());
         bufferedOutputStream = new BufferedOutputStream(outputStream);
-        scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r);
-                thread.setName("IndexStoreWriter-Write-Thread");
-                return thread;
-            }
-        });
         startAutoFlush();
         isClosed.set(false);
     }
 
     private void startAutoFlush() {
+        scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread thread = new Thread(r);
+                thread.setName("IndexStoreWriter-Thread");
+                return thread;
+            }
+        });
         scheduledExecutorService.scheduleWithFixedDelay(new Runnable() {
             @Override
             public void run() {
@@ -75,11 +83,11 @@ public class IndexStoreWriter {
     public static class IndexBlock {
         byte cmd;
         int collectionID;
-        int pos;
+        long pos;
         int capacity;
         Object index;
 
-        public static IndexBlock createPutIndexBlock(int collectionID, int pos, int capacity, Object index) {
+        public static IndexBlock createPutIndexBlock(int collectionID, long pos, int capacity, Object index) {
             IndexBlock indexBlock = new IndexBlock();
             indexBlock.cmd = CMD_PUT;
             indexBlock.collectionID = collectionID;
@@ -90,7 +98,18 @@ public class IndexStoreWriter {
         }
 
 
-        public static IndexBlock createRemoveIndexBlock(int collectionID, int pos, int capacity, Object index) {
+        public static IndexBlock createModifyIndexBlock(int collectionID, long pos, int capacity, Object index) {
+            IndexBlock indexBlock = new IndexBlock();
+            indexBlock.cmd = CMD_MODIFY;
+            indexBlock.collectionID = collectionID;
+            indexBlock.pos = pos;
+            indexBlock.capacity = capacity;
+            indexBlock.index = index;
+            return indexBlock;
+        }
+
+
+        public static IndexBlock createRemoveIndexBlock(int collectionID, long pos, int capacity, Object index) {
             IndexBlock indexBlock = new IndexBlock();
             indexBlock.cmd = CMD_REMOVE;
             indexBlock.collectionID = collectionID;
@@ -116,7 +135,7 @@ public class IndexStoreWriter {
             return collectionID;
         }
 
-        public int getPos() {
+        public long getPos() {
             return pos;
         }
 
@@ -145,14 +164,14 @@ public class IndexStoreWriter {
     }
 
 
-    private void writeIndex(byte cmd,int collectionID, int pos, int capacity, Object index)  {
+    private void writeIndex(byte cmd,int collectionID, long pos, int capacity, Object index)  {
         ReentrantReadWriteLock.WriteLock lock = readWriteLock.writeLock();
         try {
             lock.lock();
             DataOutputStream dataOutputStream = new DataOutputStream(bufferedOutputStream);
             dataOutputStream.writeByte(cmd);
             dataOutputStream.writeInt(collectionID);
-            dataOutputStream.writeInt(pos);
+            dataOutputStream.writeLong(pos);
             dataOutputStream.writeInt(capacity);
             byte[] indexObject = PrimitiveTypeSerializer.serializeAnything(index);
             dataOutputStream.writeInt(indexObject.length);

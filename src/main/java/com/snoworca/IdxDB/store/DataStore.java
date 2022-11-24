@@ -138,11 +138,14 @@ public class DataStore implements Iterable<DataBlock> {
         if(dataBlock == null) {
             return write(collectionID, buffer);
         }
-        return dataWriter.changeData(dataBlock, buffer, false);
+        DataBlock changedBlock = dataWriter.changeData(dataBlock, buffer, false);
+        if(changedBlock == null) {
+            dataBlock.setNotChangedPos(true);
+        }
+        return changedBlock;
     }
 
     public void replaceOrWrite(DataBlock[] dataBlocks) throws IOException {
-
 
         ArrayList<DataBlock> writeBlockList = new ArrayList<>();
         for(int i = 0, n = dataBlocks.length; i < n; ++i) {
@@ -158,6 +161,7 @@ public class DataStore implements Iterable<DataBlock> {
             } else {
                 DataBlock changedBlock = dataWriter.changeData(readBlock, dataBlock.getData(), true);
                 if (changedBlock == null) {
+                    dataBlock.setNotChangedPos(true);
                     writeBlockList.add(dataBlock);
                 } else {
                     dataBlock.setCapacity(changedBlock.getCapacity());

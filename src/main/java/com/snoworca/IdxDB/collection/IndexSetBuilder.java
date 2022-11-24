@@ -10,18 +10,21 @@ public class IndexSetBuilder {
 
     private IndexSetOption indexSetOption = null;
     private DataStore dataStore;
+    private IndexStoreWriter indexStoreWriter;
 
     private ReentrantLock createLock;
     private CollectionCreateCallback callback;
 
     private int collectionID;
 
-    public IndexSetBuilder(CollectionCreateCallback callback,int id, DataStore dataStore, String name, ReentrantLock createLock) {
+    public IndexSetBuilder(CollectionCreateCallback callback,int id, DataStore dataStore,IndexStoreWriter indexStoreWriter,String name, ReentrantLock createLock) {
         this.dataStore = dataStore;
         this.createLock = createLock;
         this.callback = callback;
         this.indexSetOption = new IndexSetOption(name);
         this.collectionID =id;
+        this.indexStoreWriter = indexStoreWriter;
+
     }
 
 
@@ -65,7 +68,7 @@ public class IndexSetBuilder {
 
 
     public IndexTreeSet create() {
-        IndexTreeSet indexTreeSet = new IndexTreeSet(collectionID, dataStore, indexSetOption);
+        IndexTreeSet indexTreeSet = new IndexTreeSet(collectionID, dataStore,indexStoreWriter, indexSetOption);
         createLock.lock();
         this.callback.onCreate(indexTreeSet);
         createLock.unlock();

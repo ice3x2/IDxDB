@@ -20,8 +20,8 @@ public class IndexTreeSet extends IndexCollectionBase {
     private boolean isMemCacheIndex;
 
 
-    public IndexTreeSet(int id, DataStore dataStore, IndexSetOption option) {
-        super(id, dataStore, option);
+    public IndexTreeSet(int id, DataStore dataStore,IndexStoreWriter indexStoreWriter, IndexSetOption option) {
+        super(id, dataStore,indexStoreWriter, option);
         this.indexKey = super.getIndexKey();
         this.storeDelegator = super.getStoreDelegator();
         this.indexSort = super.getSort();

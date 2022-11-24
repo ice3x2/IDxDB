@@ -25,8 +25,8 @@ public class IndexLinkedMap extends IndexCollectionBase {
 
     private boolean isMemCacheIndex;
 
-    public IndexLinkedMap(int id, DataStore dataStore, IndexMapOption collectionOption) {
-        super(id, dataStore, collectionOption);
+    public IndexLinkedMap(int id, DataStore dataStore,IndexStoreWriter indexStoreWriter,  IndexMapOption collectionOption) {
+        super(id, dataStore,indexStoreWriter, collectionOption);
     }
 
     @Override

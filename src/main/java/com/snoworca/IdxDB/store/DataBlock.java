@@ -12,6 +12,8 @@ public class DataBlock {
     private long position  = -1;
     private int originDataCapacity = -1;
 
+    private boolean isNotChangedPos = false;
+
     private DataBlock() {
 
     }
@@ -37,6 +39,16 @@ public class DataBlock {
         this.header = header;
 
     }
+
+    protected void setNotChangedPos(boolean isNotChangedPos) {
+        this.isNotChangedPos = isNotChangedPos;
+    }
+
+    public boolean isNotChangedPos() {
+        return isNotChangedPos;
+    }
+
+
 
 
 

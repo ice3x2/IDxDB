@@ -32,6 +32,7 @@ public class IdxDB {
     private final AtomicInteger lastCollectionID = new AtomicInteger(START_ID);
 
     private DataStore dataStore;
+    private IndexStoreWriter indexStoreWriter;
 
     private final static String META_INFO_TYPE_ENTRY = "entry";
 
@@ -115,6 +116,7 @@ public class IdxDB {
             }
             idxDB.dataStore = new DataStore(dbFile, dataStoreOption);
             idxDB.dataStore.open();
+            idxDB.indexStoreWriter = new IndexStoreWriter(new File(dbFile.getCanonicalFile().getAbsolutePath() + ".idx"));
 
             if(existDBFile) {
                 loadDB(idxDB);
@@ -227,15 +229,14 @@ public class IdxDB {
         }
 
         private IndexCollection restoreIndexCollection(IdxDB db,int id, CSONObject collectionOption) {
-
             String className = collectionOption.optString("className");
             IndexCollection indexCollection = null;
             if(IndexTreeSet.class.getName().equals(className)) {
-                IndexTreeSet indexTreeSet = new IndexTreeSet(id, db.dataStore, IndexSetOption.fromCSONObject(collectionOption));
+                IndexTreeSet indexTreeSet = new IndexTreeSet(id, db.dataStore, db.indexStoreWriter, IndexSetOption.fromCSONObject(collectionOption));
                 db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
                 indexCollection = indexTreeSet;
             } else if(IndexLinkedMap.class.getName().equals(className)) {
-                IndexLinkedMap indexLinkedMap = new IndexLinkedMap(id, db.dataStore, IndexMapOption.fromCSONObject(collectionOption));
+                IndexLinkedMap indexLinkedMap = new IndexLinkedMap(id, db.dataStore,db.indexStoreWriter, IndexMapOption.fromCSONObject(collectionOption));
                 db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
                 indexCollection = indexLinkedMap;
             }
@@ -331,13 +332,13 @@ public class IdxDB {
     };
 
     public IndexMapBuilder newIndexMapBuilder(String name) {
-        return new IndexMapBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,name, collectionMutableLock);
+        return new IndexMapBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,indexStoreWriter,name, collectionMutableLock);
     }
 
 
 
     public IndexSetBuilder newIndexTreeSetBuilder(String name) {
-        return new IndexSetBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,name, collectionMutableLock);
+        return new IndexSetBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,indexStoreWriter,name, collectionMutableLock);
     }
 
 

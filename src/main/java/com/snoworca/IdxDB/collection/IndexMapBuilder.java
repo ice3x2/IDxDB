@@ -14,14 +14,17 @@ public class IndexMapBuilder {
 
     private DataStore dataStore;
 
+    private IndexStoreWriter indexStoreWriter;
+
     private int collectionID;
 
-    public IndexMapBuilder(CollectionCreateCallback callback,int id, DataStore dataStore, String name, ReentrantLock createLock) {
+    public IndexMapBuilder(CollectionCreateCallback callback,int id, DataStore dataStore,IndexStoreWriter indexStoreWriter, String name, ReentrantLock createLock) {
         this.dataStore = dataStore;
         this.createLock = createLock;
         this.callback = callback;
         this.indexMapOption = new IndexMapOption(name);
         this.collectionID = id;
+        this.indexStoreWriter = indexStoreWriter;
     }
 
     IndexMapBuilder(String name, DataStore dataStore) {
@@ -55,7 +58,7 @@ public class IndexMapBuilder {
     }
 
     public IndexLinkedMap create() {
-        IndexLinkedMap indexLinkedMap = new IndexLinkedMap(collectionID, dataStore, indexMapOption);
+        IndexLinkedMap indexLinkedMap = new IndexLinkedMap(collectionID, dataStore,indexStoreWriter, indexMapOption);
         createLock.lock();
         this.callback.onCreate(indexLinkedMap);
         createLock.unlock();

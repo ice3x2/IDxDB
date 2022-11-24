@@ -19,7 +19,7 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
 
     private final int collectionID;
     private final DataStore dataStore;
-    private DataStore dataStoreOfIndexCache;
+    private IndexStoreWriter indexStoreWriter;
     private final String name;
     private LinkedHashSet<String> indexKeySet;
     private final int memCacheSize;
@@ -36,7 +36,9 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
 
     private CompressionType compressionType;
 
-    IndexCollectionBase(int id, DataStore dataStore, CollectionOption collectionOption) {
+    private boolean hasIndexCacheStore = false;
+
+    IndexCollectionBase(int id, DataStore dataStore,IndexStoreWriter indexStoreWriter, CollectionOption collectionOption) {
         this.collectionID = id;
         this.dataStore = dataStore;
         this.name = collectionOption.getName();
@@ -50,6 +52,10 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
         onInit(collectionOption);
         if (this.dataStore != null) {
             makeStoreDelegatorImpl();
+        }
+        if(indexStoreWriter != null) {
+            hasIndexCacheStore = true;
+            this.indexStoreWriter = indexStoreWriter;
         }
 
         this.collectionOption = collectionOption;
@@ -160,6 +166,9 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
         if(dataStore != null) {
             dataStore.unlink(item.getStoragePos(), item.getStoreCapacity());
         }
+        if(hasIndexCacheStore) {
+            indexStoreWriter.pushIndex(IndexStoreWriter.IndexBlock.createRemoveIndexBlock(collectionID,item.getStoragePos(),item.getStoreCapacity(), item.getIndexValue()));
+        }
         return true;
     }
 
@@ -174,6 +183,9 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
             CSONItem csonItem = items.get(i);
             csonItem.setStoragePos_(dataBlocks[i].getPosition());
             csonItem.setStoreCapacity(dataBlocks[i].getCapacity());
+            if(hasIndexCacheStore) {
+                indexStoreWriter.pushIndex(IndexStoreWriter.IndexBlock.createPutIndexBlock(collectionID,csonItem.getStoragePos(),csonItem.getStoreCapacity(), csonItem.getIndexValue()));
+            }
         }
     }
 
@@ -188,6 +200,11 @@ public abstract class IndexCollectionBase implements IndexCollection, Restorable
             CSONItem csonItem = items.get(i);
             csonItem.setStoragePos_(dataBlocks[i].getPosition());
             csonItem.setStoreCapacity(dataBlocks[i].getCapacity());
+            if(!dataBlocks[i].isNotChangedPos()) {
+                if(hasIndexCacheStore) {
+                    indexStoreWriter.pushIndex(IndexStoreWriter.IndexBlock.createModifyIndexBlock(collectionID,csonItem.getStoragePos(),csonItem.getStoreCapacity(), csonItem.getIndexValue()));
+                }
+            }
         }
     }
 
