@@ -6,6 +6,7 @@ import com.snoworca.IdxDB.collection.*;
 import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.IdxDB.store.DataStore;
 import com.snoworca.IdxDB.store.DataStoreOptions;
+import com.snoworca.IdxDB.store.IndexStoreWriter;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 import org.slf4j.Logger;
@@ -235,10 +236,6 @@ public class IdxDB {
                 IndexTreeSet indexTreeSet = new IndexTreeSet(id, db.dataStore, db.indexStoreWriter, IndexSetOption.fromCSONObject(collectionOption));
                 db.indexCollectionMap.put(indexTreeSet.getName(), indexTreeSet);
                 indexCollection = indexTreeSet;
-            } else if(IndexLinkedMap.class.getName().equals(className)) {
-                IndexLinkedMap indexLinkedMap = new IndexLinkedMap(id, db.dataStore,db.indexStoreWriter, IndexMapOption.fromCSONObject(collectionOption));
-                db.indexCollectionMap.put(indexLinkedMap.getName(), indexLinkedMap);
-                indexCollection = indexLinkedMap;
             }
             if(indexCollection != null) {
                 db.indexCollectionIDMap.put(id, indexCollection);
@@ -330,10 +327,6 @@ public class IdxDB {
             }
         };
     };
-
-    public IndexMapBuilder newIndexMapBuilder(String name) {
-        return new IndexMapBuilder(makeCollectionCreateCallback(name),lastCollectionID.getAndIncrement(), dataStore,indexStoreWriter,name, collectionMutableLock);
-    }
 
 
 

@@ -4,6 +4,7 @@ import com.snoworca.IdxDB.CompressionType;
 import com.snoworca.IdxDB.OP;
 import com.snoworca.IdxDB.store.DataBlock;
 import com.snoworca.IdxDB.store.DataStore;
+import com.snoworca.IdxDB.store.IndexStoreWriter;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 

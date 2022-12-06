@@ -1,15 +1,10 @@
 package com.snoworca.IdxDB.collection;
 
-public abstract class IndexValue {
+public class IndexValue {
 
-    abstract Object getIndexValue();
+    public Object getIndexValue() {
+        return null;
 
-    public static IndexValue newIndexValueCache(Object indexValue) {
-        return new IndexValueCache(indexValue);
-    }
-
-    public static IndexValue newIndexValueItem(CSONItem csonItem) {
-        return new IndexValueItem(csonItem);
     }
 
 
@@ -31,6 +26,5 @@ public abstract class IndexValue {
     }
 
 
-    abstract void changeIndexValue(CSONItem csonItem);
 
 }

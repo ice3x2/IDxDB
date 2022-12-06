@@ -2,11 +2,9 @@ package com.snoworca.IdxDB;
 
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
-import com.snoworca.IdxDB.collection.IndexLinkedMap;
 import com.snoworca.IdxDB.collection.IndexTreeSet;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -116,13 +114,7 @@ class IdxDBTest {
 
         for(int k = 0; k < collectionSize; ++k) {
             IndexCollection indexCollection;
-            if(k == 5) {
-                indexCollection = idxDB.newIndexMapBuilder(k + "").memCacheSize(memCacheSize).index("date", 1).create();
-            } else if(k == 6) {
-                indexCollection = idxDB.newIndexMapBuilder(k +"").memCacheSize(memCacheSize).setAccessOrder(true).index("date" , -1).create();
-            } else {
-                indexCollection = idxDB. newIndexTreeSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
-            }
+            indexCollection = idxDB. newIndexTreeSetBuilder(k +"").setFileStore(true).memCacheSize(memCacheSize).index("date" , 1).create();
 
             for(int i = 0; i < rowSize; ++i) {
                 indexCollection.add(new CSONObject().put("date", i).put("str", i + ""));
@@ -195,40 +187,6 @@ class IdxDBTest {
 
 
         //indexCollection.findByIndex(5, FindOption)
-
-        IndexLinkedMap indexLinkedMap = (IndexLinkedMap)idxDB.get("5");
-        CSONObject result = indexLinkedMap.findOneByIndex(1);
-        assertEquals(result.optString("str"), "1");
-
-
-        start = System.currentTimeMillis();
-        List<CSONObject>  list = indexLinkedMap.list(1000, false);
-        System.out.println((System.currentTimeMillis() - start) + "ms");
-
-        start = System.currentTimeMillis();
-        list = indexLinkedMap.list(1000, true);
-        System.out.println((System.currentTimeMillis() - start) + "ms");
-
-
-        indexLinkedMap = (IndexLinkedMap)idxDB.get("6");
-        result = indexLinkedMap.findOneByIndex(5000);
-        assertEquals(result.optString("str"), "5000");
-        result = indexLinkedMap.findOneByIndex(4000);
-        result = indexLinkedMap.findOneByIndex(3000);
-        result = indexLinkedMap.findOneByIndex(2000);
-        indexLinkedMap.commit();
-
-
-        start = System.currentTimeMillis();
-        list = indexLinkedMap.list(1000, false);
-        System.out.println( (System.currentTimeMillis() - start) + "ms");
-        assertTrue((System.currentTimeMillis() - start) < 2);
-        assertEquals("2000",list.get(0).get("str"));
-        assertEquals("3000",list.get(1).get("str"));
-        assertEquals("4000",list.get(2).get("str"));
-        assertEquals("5000",list.get(3).get("str"));
-        System.out.println((System.currentTimeMillis() - start) + "ms");
-
 
 
         file.delete();
@@ -465,31 +423,6 @@ class IdxDBTest {
     }
 
 
-    @Test
-    public void replaceDataMapTest() throws IOException {
-        File file = new File("test.db");
-        file.delete();
-        IdxDB db = IdxDB.newMaker(file).make();
-        IndexLinkedMap indexLinkedMap = db.newIndexMapBuilder("testDB").index("key", 1).setCapacityRatio(0.5f).create();
-        indexLinkedMap.add(new CSONObject().put("key", "1234567890").put("value", "BBBBBBBBBB"));
-        indexLinkedMap.commit();
-        long fileSize = file.length();
-        indexLinkedMap.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "AAAAAAAAAAAAAA"));
-        System.out.println(indexLinkedMap.commit().toString());
-        assertEquals(fileSize, file.length());
-
-        assertEquals("AAAAAAAAAAAAAA", indexLinkedMap.findOneByIndex("1234567890").get("value"));
-
-
-        indexLinkedMap.addOrReplace(new CSONObject().put("key", "1234567890").put("value", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc"));
-        indexLinkedMap.commit();
-
-        assertNotEquals(fileSize, file.length());
-
-        assertEquals("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCc", indexLinkedMap.findOneByIndex("1234567890").get("value"));
-        file.delete();
-
-    }
 
     /*
     @Test

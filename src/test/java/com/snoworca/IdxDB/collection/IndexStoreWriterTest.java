@@ -1,5 +1,7 @@
 package com.snoworca.IdxDB.collection;
 
+import com.snoworca.IdxDB.store.IndexStoreReader;
+import com.snoworca.IdxDB.store.IndexStoreWriter;
 import com.snoworca.IdxDB.util.NumberBufferConverter;
 import org.junit.jupiter.api.Test;
 

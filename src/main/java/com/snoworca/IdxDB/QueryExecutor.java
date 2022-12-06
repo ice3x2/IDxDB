@@ -3,7 +3,6 @@ package com.snoworca.IdxDB;
 import com.snoworca.IdxDB.collection.FindOption;
 import com.snoworca.IdxDB.collection.IndexCollection;
 import com.snoworca.IdxDB.collection.IndexSetBuilder;
-import com.snoworca.IdxDB.collection.IndexMapBuilder;
 import com.snoworca.cson.CSONArray;
 import com.snoworca.cson.CSONObject;
 
@@ -93,12 +92,6 @@ public class QueryExecutor {
             indexSetBuilder.memCacheSize(memCacheSize);
             indexSetBuilder.setFileStore(isFileStore);
             indexSetBuilder.create();
-        } else if("newIndexLinkedMap".equalsIgnoreCase(method)) {
-            IndexMapBuilder indexMapBuilder = store.newIndexMapBuilder(collection);
-            indexMapBuilder.index(firstIndexKey, sortMethod);
-            indexMapBuilder.memCacheSize(memCacheSize);
-            indexMapBuilder.setAccessOrder(accessOrder);
-            indexMapBuilder.create();
         }
         return new CSONObject().put("isError", false).put("success", true).put("message", "ok");
     }
