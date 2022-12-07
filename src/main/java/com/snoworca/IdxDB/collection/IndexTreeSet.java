@@ -254,7 +254,6 @@ public class IndexTreeSet extends IndexCollectionBase {
             return null;
         }
         return foundItem;
-
     }
 
 

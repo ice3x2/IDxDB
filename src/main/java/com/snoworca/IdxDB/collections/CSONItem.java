@@ -1,12 +1,14 @@
-package com.snoworca.IdxDB.collection;
+package com.snoworca.IdxDB.collections;
 
+import com.snoworca.IdxDB.collection.StoreDelegator;
+import com.snoworca.IdxDB.collection.StoredInfo;
 import com.snoworca.IdxDB.exception.MissingIndexValueException;
 import com.snoworca.cson.CSONObject;
 
 import java.math.BigDecimal;
 import java.util.regex.Pattern;
 
-public class CSONItem implements Comparable<CSONItem> {
+class CSONItem implements Comparable<CSONItem> {
 
     private final static Pattern NUM_PATTERN = Pattern.compile("[+-]?([0-9]*[.])?[0-9]+");
 
